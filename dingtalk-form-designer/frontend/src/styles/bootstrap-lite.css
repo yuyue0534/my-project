@@ -1,0 +1,380 @@
+/* bootstrap-lite.css
+   Minimal bootstrap-like styling via generic selectors.
+   Goal: compact, clean, bright, without touching component JSX.
+*/
+
+:root {
+    --bg: #ffffff;
+    --text: #212529;
+    --muted: #6c757d;
+    --border: #dee2e6;
+    --border2: #e9ecef;
+    --primary: #0d6efd;
+    --primary-hover: #0b5ed7;
+    --danger: #dc3545;
+    --danger-hover: #bb2d3b;
+    --shadow: 0 1px 2px rgba(0, 0, 0, .06);
+    --radius: 8px;
+    --radius-sm: 6px;
+    --pad: 10px;
+    --pad-sm: 8px;
+    --font: ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans", "Apple Color Emoji", "Segoe UI Emoji";
+}
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    height: 100%;
+}
+
+body {
+    margin: 0;
+    font-family: var(--font);
+    color: var(--text);
+    background: #f8f9fa;
+    line-height: 1.35;
+    font-size: 14px;
+}
+
+/* Layout containers (your app uses inline borders/paddings; we just soften them) */
+div[style*="borderRight"],
+div[style*="border: \"1px solid #eee\""],
+div[style*="border: '1px solid #eee'"] {
+    background: var(--bg);
+}
+
+/* Headings */
+h2,
+h3,
+h4 {
+    margin: 10px 0 8px;
+    line-height: 1.2;
+}
+
+h2 {
+    font-size: 20px;
+}
+
+h3 {
+    font-size: 16px;
+}
+
+h4 {
+    font-size: 14px;
+    color: var(--text);
+}
+
+/* Labels in FieldEditor / etc. */
+label {
+    display: grid;
+    gap: 6px;
+    font-size: 13px;
+    color: var(--text);
+}
+
+label>input,
+label>select,
+label>textarea {
+    margin-top: 2px;
+}
+
+/* Inputs */
+input,
+select,
+textarea {
+    width: 100%;
+    padding: 7px 10px;
+    border: 1px solid var(--border);
+    border-radius: var(--radius-sm);
+    background: #fff;
+    outline: none;
+    font-size: 13px;
+}
+
+input[type="checkbox"] {
+    width: auto;
+    padding: 0;
+    margin: 0 6px 0 0;
+    border-radius: 4px;
+    vertical-align: middle;
+}
+
+textarea {
+    resize: vertical;
+}
+
+/* Focus */
+input:focus,
+select:focus,
+textarea:focus {
+    border-color: rgba(13, 110, 253, .5);
+    box-shadow: 0 0 0 .2rem rgba(13, 110, 253, .15);
+}
+
+/* Buttons */
+button {
+    appearance: none;
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+}
+
+button:hover {
+    background: #f8f9fa;
+}
+
+button:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+/* "Primary" feel for common actions by position:
+     - first button in a button row gets primary styling
+     Works with your many "button groups" using display:flex gap:8
+  */
+div[style*="display: \"flex\""][style*="gap: 8px"]>button:first-child,
+div[style*="display: 'flex'"][style*="gap: 8px"]>button:first-child {
+    border-color: var(--primary);
+    background: var(--primary);
+    color: #fff;
+}
+
+div[style*="display: \"flex\""][style*="gap: 8px"]>button:first-child:hover,
+div[style*="display: 'flex'"][style*="gap: 8px"]>button:first-child:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+/* Make “reject / delete” look dangerous by text match (minimal intrusion)
+     Your UI uses Chinese "删除/驳回"; we style those buttons.
+  */
+button:has(:is()) {
+    /* no-op for older browsers; harmless */
+}
+
+button {
+    position: relative;
+}
+
+button:where(:not(:disabled))[onclick*="delete"],
+button:where(:not(:disabled)):is(:contains("删除"), :contains("驳回")) {}
+
+/* Fallback: style by attribute isn't reliable; instead we do a lightweight trick:
+     - We can't reliably select by text in pure CSS, so we style "second button in row"
+       as danger in approval rows (like Through / Reject / Return).
+  */
+div[style*="display: \"flex\""][style*="gap: 8px"]>button:nth-child(2),
+div[style*="display: 'flex'"][style*="gap: 8px"]>button:nth-child(2) {
+    border-color: var(--danger);
+    color: var(--danger);
+    background: #fff;
+}
+
+div[style*="display: \"flex\""][style*="gap: 8px"]>button:nth-child(2):hover,
+div[style*="display: 'flex'"][style*="gap: 8px"]>button:nth-child(2):hover {
+    background: rgba(220, 53, 69, .06);
+}
+
+/* Cards */
+div[style*="border: \"1px solid #ddd\""],
+div[style*="border: '1px solid #ddd'"],
+div[style*="border: \"1px solid #eee\""],
+div[style*="border: '1px solid #eee'"],
+div[style*="border: \"1px solid #eee\""],
+div[style*="border: '1px solid #eee'"] {
+    border: 1px solid var(--border) !important;
+    border-radius: var(--radius);
+    background: #fff;
+    box-shadow: var(--shadow);
+}
+
+/* Compact spacing for those cards */
+div[style*="padding: 10px"] {
+    padding: var(--pad) !important;
+}
+
+div[style*="padding: 12px"] {
+    padding: 12px !important;
+}
+
+div[style*="padding: 8px"] {
+    padding: var(--pad-sm) !important;
+}
+
+/* Muted small text */
+div[style*="fontSize: 12px"],
+span[style*="fontSize: 12px"] {
+    color: var(--muted) !important;
+}
+
+/* Pre blocks */
+pre {
+    background: #f8f9fa !important;
+    border: 1px solid var(--border2);
+    border-radius: var(--radius);
+    padding: 10px !important;
+    overflow: auto;
+    font-size: 12px;
+}
+
+/* Make overall page more compact */
+summary {
+    user-select: none;
+}
+
+/* -------- Bootstrap-like button utilities (opt-in via className) -------- */
+
+.btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 6px;
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+    border: 1px solid var(--border);
+    background: #fff;
+    color: var(--text);
+    cursor: pointer;
+    font-size: 13px;
+    line-height: 1.2;
+    text-decoration: none;
+    user-select: none;
+}
+
+.btn:hover {
+    background: #f8f9fa;
+}
+
+.btn:disabled {
+    opacity: .6;
+    cursor: not-allowed;
+}
+
+.btn-sm {
+    padding: 4px 8px;
+    font-size: 12px;
+    border-radius: 6px;
+}
+
+.btn-primary {
+    background: var(--primary);
+    border-color: var(--primary);
+    color: #fff;
+}
+
+.btn-primary:hover {
+    background: var(--primary-hover);
+    border-color: var(--primary-hover);
+}
+
+.btn-danger {
+    background: var(--danger);
+    border-color: var(--danger);
+    color: #fff;
+}
+
+.btn-danger:hover {
+    background: var(--danger-hover);
+    border-color: var(--danger-hover);
+}
+
+.btn-outline {
+    background: #fff;
+}
+
+.btn-outline-primary {
+    border-color: rgba(13, 110, 253, .4);
+    color: var(--primary);
+}
+
+.btn-outline-primary:hover {
+    background: rgba(13, 110, 253, .06);
+    border-color: rgba(13, 110, 253, .65);
+}
+
+.btn-outline-danger {
+    border-color: rgba(220, 53, 69, .5);
+    color: var(--danger);
+}
+
+.btn-outline-danger:hover {
+    background: rgba(220, 53, 69, .06);
+    border-color: rgba(220, 53, 69, .7);
+}
+
+/* Make native button keep your base look but allow .btn override */
+button.btn {
+    padding: 6px 10px;
+    border-radius: var(--radius-sm);
+}
+
+/* tighter button rows */
+div[style*="display: \"flex\""][style*="gap: 8px"],
+div[style*="display: 'flex'"][style*="gap: 8px"] {
+    gap: 6px !important;
+}
+
+/* reduce huge whitespace between cards */
+div[style*="display: \"grid\""][style*="gap: 10px"] {
+    gap: 8px !important;
+}
+
+div[style*="display: \"grid\""][style*="gap: 8px"] {
+    gap: 8px !important;
+}
+
+/* make selects not overly tall */
+select {
+    height: 32px;
+}
+
+/* -------- Bootstrap-like card utilities (opt-in) -------- */
+
+.card {
+    background: #fff;
+    border: 1px solid var(--border);
+    border-radius: var(--radius);
+    box-shadow: var(--shadow);
+}
+
+.card-header {
+    padding: 10px 12px;
+    border-bottom: 1px solid var(--border2);
+    background: #f8f9fa;
+    border-top-left-radius: var(--radius);
+    border-top-right-radius: var(--radius);
+    font-weight: 700;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+}
+
+.card-body {
+    padding: 12px;
+}
+
+.card-body.compact {
+    padding: 10px;
+}
+
+/* Optional: small spacing helpers */
+.text-muted {
+    color: var(--muted);
+}
+
+.mb-2 {
+    margin-bottom: 8px;
+}
+
+.mt-2 {
+    margin-top: 8px;
+}
