@@ -1,0 +1,11 @@
+{
+  "name": "dingtalk-form-designer",
+  "private": true,
+  "workspaces": ["backend", "frontend"],
+  "scripts": {
+    "dev": "echo \"Run backend and frontend separately: (1) cd backend && CGO_ENABLED=0 go run .  (2) cd frontend && npm i && npm run dev\""
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.0"
+  }
+}
