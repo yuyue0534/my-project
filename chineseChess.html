@@ -1,0 +1,1157 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>中国象棋 - 楚河汉界</title>
+    <link href="https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;600;700&display=swap" rel="stylesheet">
+    <style>
+        :root {
+            --board-bg: #f5deb3;
+            --board-line: #8b4513;
+            --board-border: #5c3317;
+            --red-piece: #c41e3a;
+            --red-piece-dark: #8b0000;
+            --black-piece: #1a1a1a;
+            --piece-bg: #fffaf0;
+            --piece-border: #d4a574;
+            --highlight: rgba(255, 215, 0, 0.6);
+            --valid-move: rgba(76, 175, 80, 0.5);
+            --shadow: rgba(0, 0, 0, 0.3);
+            --wood-dark: #8b5a2b;
+            --wood-light: #deb887;
+            --gold: #ffd700;
+            --ivory: #fffff0;
+        }
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: 'Noto Serif SC', serif;
+            background: linear-gradient(135deg, #2c1810 0%, #4a2c17 50%, #2c1810 100%);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 20px;
+            color: var(--ivory);
+        }
+        .game-header { text-align: center; margin-bottom: 20px; }
+        .game-title {
+            font-family: 'Ma Shan Zheng', cursive;
+            font-size: 3rem;
+            color: var(--gold);
+            text-shadow: 3px 3px 6px rgba(0,0,0,0.5);
+            letter-spacing: 0.2em;
+        }
+        .game-subtitle { font-size: 1rem; color: var(--wood-light); letter-spacing: 0.3em; }
+        .game-container { display: flex; gap: 30px; align-items: flex-start; flex-wrap: wrap; justify-content: center; }
+        .board-section { display: flex; flex-direction: column; align-items: center; }
+        .player-info {
+            display: flex; align-items: center; gap: 15px; padding: 10px 25px;
+            background: linear-gradient(180deg, #3d2817 0%, #2a1a0f 100%);
+            border-radius: 8px; border: 2px solid var(--wood-dark); margin: 10px 0;
+            min-width: 300px; justify-content: center; transition: all 0.3s ease;
+        }
+        .player-info.active { border-color: var(--gold); box-shadow: 0 0 15px rgba(255, 215, 0, 0.4); }
+        .player-info.red .player-name { color: var(--red-piece); }
+        .player-info.black .player-name { color: #888; }
+        .player-icon {
+            width: 40px; height: 40px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Ma Shan Zheng', cursive; font-size: 1.5rem; border: 2px solid;
+        }
+        .player-info.red .player-icon { background: var(--piece-bg); color: var(--red-piece); border-color: var(--red-piece); }
+        .player-info.black .player-icon { background: var(--piece-bg); color: var(--black-piece); border-color: var(--black-piece); }
+        .player-name { font-size: 1.2rem; font-weight: 600; }
+        .captured-pieces { display: flex; gap: 3px; flex-wrap: wrap; max-width: 150px; }
+        .captured-piece { font-size: 0.8rem; opacity: 0.7; }
+        .board-wrapper {
+            position: relative; padding: 20px;
+            background: linear-gradient(145deg, #5c3d2e 0%, #3d2817 50%, #2a1a0f 100%);
+            border-radius: 12px;
+            box-shadow: 0 10px 40px rgba(0,0,0,0.5), inset 0 2px 4px rgba(255,255,255,0.1);
+            border: 4px solid var(--wood-dark);
+        }
+        .board-frame {
+            padding: 15px;
+            background: linear-gradient(180deg, var(--wood-dark) 0%, #6b4423 100%);
+            border-radius: 8px; border: 3px solid #3d2817;
+        }
+        #chessboard {
+            position: relative; width: 450px; height: 500px;
+            background: var(--board-bg);
+            border: 3px solid var(--board-border);
+            box-shadow: inset 0 0 20px rgba(139, 69, 19, 0.3);
+        }
+        .board-lines { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; }
+        .river {
+            position: absolute; top: 200px; left: 0; width: 100%; height: 100px;
+            display: flex; align-items: center; justify-content: center; gap: 60px;
+            background: linear-gradient(180deg, rgba(173,216,230,0.1) 0%, rgba(173,216,230,0.2) 50%, rgba(173,216,230,0.1) 100%);
+            pointer-events: none;
+        }
+        .river-text { font-family: 'Ma Shan Zheng', cursive; font-size: 2rem; color: var(--board-line); opacity: 0.6; }
+        .piece {
+            position: absolute; width: 46px; height: 46px; border-radius: 50%;
+            display: flex; align-items: center; justify-content: center;
+            font-family: 'Ma Shan Zheng', cursive; font-size: 1.6rem;
+            cursor: pointer; transition: all 0.15s ease; user-select: none; z-index: 10;
+            box-shadow: 0 3px 8px var(--shadow), inset 0 -2px 4px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.3);
+            border: 2px solid var(--piece-border);
+            background: radial-gradient(circle at 30% 30%, var(--piece-bg) 0%, #e8dcc8 70%, #d4c4a8 100%);
+        }
+        .piece.red { color: var(--red-piece); border-color: var(--red-piece-dark); }
+        .piece.black { color: var(--black-piece); border-color: #444; }
+        .piece:hover { transform: scale(1.08); box-shadow: 0 5px 15px var(--shadow), inset 0 -2px 4px rgba(0,0,0,0.2), inset 0 2px 4px rgba(255,255,255,0.3); }
+        .piece.selected { transform: scale(1.1); box-shadow: 0 0 0 3px var(--gold), 0 5px 20px rgba(255,215,0,0.5); z-index: 20; }
+        .piece.dragging { z-index: 100; transform: scale(1.15); box-shadow: 0 10px 30px rgba(0,0,0,0.4), 0 0 0 3px var(--gold); cursor: grabbing; }
+        .piece.last-move { box-shadow: 0 0 0 2px rgba(76,175,80,0.8), 0 3px 8px var(--shadow); }
+        .piece.in-check { animation: check-pulse 0.5s ease infinite alternate; }
+        @keyframes check-pulse {
+            from { box-shadow: 0 0 0 3px rgba(255,0,0,0.6), 0 3px 8px var(--shadow); }
+            to { box-shadow: 0 0 0 6px rgba(255,0,0,0.3), 0 0 20px rgba(255,0,0,0.5), 0 3px 8px var(--shadow); }
+        }
+        .valid-move-indicator {
+            position: absolute; width: 20px; height: 20px; border-radius: 50%;
+            background: var(--valid-move); transform: translate(-50%, -50%);
+            pointer-events: none; z-index: 5; animation: pulse 1s ease infinite;
+        }
+        .valid-move-indicator.capture { width: 44px; height: 44px; background: transparent; border: 3px solid rgba(255,0,0,0.6); }
+        @keyframes pulse { 0%, 100% { opacity: 0.6; transform: translate(-50%, -50%) scale(1); } 50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); } }
+        .control-panel {
+            background: linear-gradient(180deg, #3d2817 0%, #2a1a0f 100%);
+            border-radius: 12px; padding: 25px; border: 3px solid var(--wood-dark);
+            min-width: 280px; box-shadow: 0 5px 20px rgba(0,0,0,0.3);
+        }
+        .panel-title { font-family: 'Ma Shan Zheng', cursive; font-size: 1.5rem; color: var(--gold); text-align: center; margin-bottom: 20px; padding-bottom: 10px; border-bottom: 1px solid var(--wood-dark); }
+        .control-group { margin-bottom: 20px; }
+        .control-label { display: block; margin-bottom: 8px; color: var(--wood-light); font-size: 0.9rem; }
+        .btn { width: 100%; padding: 12px 20px; border: none; border-radius: 6px; font-family: 'Noto Serif SC', serif; font-size: 1rem; cursor: pointer; transition: all 0.2s ease; margin-bottom: 10px; }
+        .btn-primary { background: linear-gradient(180deg, var(--red-piece) 0%, var(--red-piece-dark) 100%); color: white; border: 2px solid var(--red-piece-dark); }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(196,30,58,0.4); }
+        .btn-secondary { background: linear-gradient(180deg, #555 0%, #333 100%); color: white; border: 2px solid #222; }
+        .btn-secondary:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(0,0,0,0.4); }
+        .btn-gold { background: linear-gradient(180deg, var(--gold) 0%, #b8860b 100%); color: #2a1a0f; border: 2px solid #8b6914; font-weight: 600; }
+        .btn-gold:hover { transform: translateY(-2px); box-shadow: 0 4px 15px rgba(255,215,0,0.4); }
+        .btn:disabled { opacity: 0.5; cursor: not-allowed; transform: none !important; }
+        .mode-selector { display: flex; gap: 10px; margin-bottom: 15px; }
+        .mode-btn { flex: 1; padding: 10px; border: 2px solid var(--wood-dark); background: #2a1a0f; color: var(--wood-light); border-radius: 6px; cursor: pointer; transition: all 0.2s ease; font-family: 'Noto Serif SC', serif; }
+        .mode-btn.active { border-color: var(--gold); background: linear-gradient(180deg, #4a3020 0%, #2a1a0f 100%); color: var(--gold); }
+        .mode-btn:hover { border-color: var(--gold); }
+        .difficulty-selector { display: flex; gap: 8px; }
+        .diff-btn { flex: 1; padding: 8px; border: 2px solid var(--wood-dark); background: #2a1a0f; color: var(--wood-light); border-radius: 4px; cursor: pointer; transition: all 0.2s ease; font-size: 0.85rem; font-family: 'Noto Serif SC', serif; }
+        .diff-btn.active { border-color: var(--gold); color: var(--gold); }
+        .diff-btn:hover { border-color: var(--gold); }
+        .move-history { background: #1a0f08; border-radius: 6px; padding: 10px; max-height: 200px; overflow-y: auto; border: 1px solid var(--wood-dark); }
+        .move-history::-webkit-scrollbar { width: 6px; }
+        .move-history::-webkit-scrollbar-track { background: #2a1a0f; }
+        .move-history::-webkit-scrollbar-thumb { background: var(--wood-dark); border-radius: 3px; }
+        .move-record { display: flex; padding: 4px 8px; font-size: 0.85rem; border-bottom: 1px solid #2a1a0f; }
+        .move-record:hover { background: #2a1a0f; }
+        .move-number { width: 30px; color: #666; }
+        .move-red { flex: 1; color: var(--red-piece); }
+        .move-black { flex: 1; color: #888; }
+        .game-status { text-align: center; padding: 15px; background: #1a0f08; border-radius: 6px; margin-bottom: 15px; border: 1px solid var(--wood-dark); }
+        .status-text { font-size: 1.1rem; color: var(--gold); }
+        .status-text.check { color: #ff4444; animation: blink 0.5s ease infinite alternate; }
+        @keyframes blink { from { opacity: 1; } to { opacity: 0.5; } }
+        .modal { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.8); z-index: 1000; align-items: center; justify-content: center; }
+        .modal.show { display: flex; }
+        .modal-content { background: linear-gradient(180deg, #4a3020 0%, #2a1a0f 100%); border-radius: 12px; padding: 40px; text-align: center; border: 3px solid var(--gold); box-shadow: 0 0 50px rgba(255,215,0,0.3); animation: modalIn 0.3s ease; }
+        @keyframes modalIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+        .modal-title { font-family: 'Ma Shan Zheng', cursive; font-size: 2.5rem; color: var(--gold); margin-bottom: 20px; }
+        .modal-message { font-size: 1.2rem; color: var(--ivory); margin-bottom: 30px; }
+        .modal-buttons { display: flex; gap: 15px; justify-content: center; }
+        .modal-buttons .btn { width: auto; min-width: 120px; }
+        .tooltip { position: fixed; background: rgba(42,26,15,0.95); color: var(--ivory); padding: 8px 12px; border-radius: 4px; font-size: 0.85rem; pointer-events: none; z-index: 1000; border: 1px solid var(--gold); opacity: 0; transition: opacity 0.2s; }
+        .tooltip.show { opacity: 1; }
+        .loading { display: none; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 50; }
+        .loading.show { display: block; }
+        .loading-spinner { width: 50px; height: 50px; border: 4px solid var(--wood-dark); border-top-color: var(--gold); border-radius: 50%; animation: spin 1s linear infinite; }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        .replay-controls { display: none; align-items: center; justify-content: center; gap: 10px; margin-top: 10px; }
+        .replay-controls.show { display: flex; }
+        .replay-btn { width: 40px; height: 40px; border-radius: 50%; border: 2px solid var(--wood-dark); background: #2a1a0f; color: var(--gold); cursor: pointer; display: flex; align-items: center; justify-content: center; transition: all 0.2s; }
+        .replay-btn:hover { border-color: var(--gold); background: #3d2817; }
+        .replay-progress { color: var(--wood-light); font-size: 0.9rem; min-width: 80px; text-align: center; }
+        @media (max-width: 900px) {
+            .game-container { flex-direction: column; }
+            #chessboard { width: 360px; height: 400px; }
+            .piece { width: 36px; height: 36px; font-size: 1.3rem; }
+            .valid-move-indicator.capture { width: 34px; height: 34px; }
+            .control-panel { min-width: 360px; }
+        }
+        .piece-move-animation { transition: left 0.2s ease-out, top 0.2s ease-out; }
+    </style>
+</head>
+<body>
+    <header class="game-header">
+        <h1 class="game-title">中國象棋</h1>
+        <p class="game-subtitle">楚 河 漢 界</p>
+    </header>
+    <main class="game-container">
+        <section class="board-section">
+            <div class="player-info black" id="blackPlayer">
+                <div class="player-icon">將</div>
+                <span class="player-name" id="blackName">黑方</span>
+                <div class="captured-pieces" id="blackCaptured"></div>
+            </div>
+            <div class="board-wrapper">
+                <div class="board-frame">
+                    <div id="chessboard">
+                        <svg class="board-lines" viewBox="0 0 450 500">
+                            <g stroke="#8b4513" stroke-width="1.5">
+                                <line x1="25" y1="25" x2="425" y2="25"/><line x1="25" y1="75" x2="425" y2="75"/>
+                                <line x1="25" y1="125" x2="425" y2="125"/><line x1="25" y1="175" x2="425" y2="175"/>
+                                <line x1="25" y1="225" x2="425" y2="225"/><line x1="25" y1="275" x2="425" y2="275"/>
+                                <line x1="25" y1="325" x2="425" y2="325"/><line x1="25" y1="375" x2="425" y2="375"/>
+                                <line x1="25" y1="425" x2="425" y2="425"/><line x1="25" y1="475" x2="425" y2="475"/>
+                            </g>
+                            <g stroke="#8b4513" stroke-width="1.5">
+                                <line x1="25" y1="25" x2="25" y2="475"/>
+                                <line x1="75" y1="25" x2="75" y2="225"/><line x1="75" y1="275" x2="75" y2="475"/>
+                                <line x1="125" y1="25" x2="125" y2="225"/><line x1="125" y1="275" x2="125" y2="475"/>
+                                <line x1="175" y1="25" x2="175" y2="225"/><line x1="175" y1="275" x2="175" y2="475"/>
+                                <line x1="225" y1="25" x2="225" y2="225"/><line x1="225" y1="275" x2="225" y2="475"/>
+                                <line x1="275" y1="25" x2="275" y2="225"/><line x1="275" y1="275" x2="275" y2="475"/>
+                                <line x1="325" y1="25" x2="325" y2="225"/><line x1="325" y1="275" x2="325" y2="475"/>
+                                <line x1="375" y1="25" x2="375" y2="225"/><line x1="375" y1="275" x2="375" y2="475"/>
+                                <line x1="425" y1="25" x2="425" y2="475"/>
+                            </g>
+                            <g stroke="#8b4513" stroke-width="1.5">
+                                <line x1="175" y1="25" x2="275" y2="75"/><line x1="275" y1="25" x2="175" y2="75"/>
+                                <line x1="175" y1="425" x2="275" y2="475"/><line x1="275" y1="425" x2="175" y2="475"/>
+                            </g>
+                        </svg>
+                        <div class="river"><span class="river-text">楚 河</span><span class="river-text">漢 界</span></div>
+                        <div class="loading" id="loading"><div class="loading-spinner"></div></div>
+                    </div>
+                </div>
+            </div>
+            <div class="player-info red active" id="redPlayer">
+                <div class="player-icon">帥</div>
+                <span class="player-name" id="redName">红方</span>
+                <div class="captured-pieces" id="redCaptured"></div>
+            </div>
+            <div class="replay-controls" id="replayControls">
+                <button class="replay-btn" id="replayStart" title="回到开始">⏮</button>
+                <button class="replay-btn" id="replayPrev" title="上一步">◀</button>
+                <span class="replay-progress" id="replayProgress">0/0</span>
+                <button class="replay-btn" id="replayNext" title="下一步">▶</button>
+                <button class="replay-btn" id="replayEnd" title="到最后">⏭</button>
+                <button class="replay-btn" id="replayExit" title="退出回放">✕</button>
+            </div>
+        </section>
+        <aside class="control-panel">
+            <h2 class="panel-title">游戏控制</h2>
+            <div class="game-status"><span class="status-text" id="gameStatus">红方先行</span></div>
+            <div class="control-group">
+                <label class="control-label">游戏模式</label>
+                <div class="mode-selector">
+                    <button class="mode-btn active" data-mode="pvp" id="modePvP">双人对战</button>
+                    <button class="mode-btn" data-mode="pve" id="modePvE">人机对战</button>
+                </div>
+            </div>
+            <div class="control-group" id="difficultyGroup" style="display: none;">
+                <label class="control-label">AI难度</label>
+                <div class="difficulty-selector">
+                    <button class="diff-btn" data-level="1">初级</button>
+                    <button class="diff-btn active" data-level="2">中级</button>
+                    <button class="diff-btn" data-level="3">高级</button>
+                </div>
+            </div>
+            <div class="control-group">
+                <button class="btn btn-gold" id="btnNewGame">开始新局</button>
+                <button class="btn btn-secondary" id="btnUndo">悔棋</button>
+                <button class="btn btn-secondary" id="btnHint">走子提示</button>
+                <button class="btn btn-secondary" id="btnReplay">棋局回放</button>
+                <button class="btn btn-secondary" id="btnSave">保存棋局</button>
+                <button class="btn btn-secondary" id="btnLoad">载入棋局</button>
+            </div>
+            <div class="control-group">
+                <label class="control-label">走棋记录</label>
+                <div class="move-history" id="moveHistory"><div class="move-record" style="color: #666; text-align: center;">暂无记录</div></div>
+            </div>
+        </aside>
+    </main>
+    <div class="modal" id="gameOverModal">
+        <div class="modal-content">
+            <h3 class="modal-title" id="modalTitle">游戏结束</h3>
+            <p class="modal-message" id="modalMessage">红方获胜！</p>
+            <div class="modal-buttons">
+                <button class="btn btn-gold" id="btnPlayAgain">再来一局</button>
+                <button class="btn btn-secondary" id="btnCloseModal">关闭</button>
+            </div>
+        </div>
+    </div>
+    <div class="tooltip" id="tooltip"></div>
+    <input type="file" id="fileInput" accept=".json" style="display: none;">
+    <script>
+// ==================== 游戏常量 ====================
+const BOARD_WIDTH = 9;
+const BOARD_HEIGHT = 10;
+const CELL_SIZE = 50;
+const PIECE_OFFSET = 25;
+
+const PIECES = { KING: 'king', ADVISOR: 'advisor', ELEPHANT: 'elephant', HORSE: 'horse', CHARIOT: 'chariot', CANNON: 'cannon', PAWN: 'pawn' };
+
+const PIECE_NAMES = {
+    red: { king: '帥', advisor: '仕', elephant: '相', horse: '傌', chariot: '俥', cannon: '炮', pawn: '兵' },
+    black: { king: '將', advisor: '士', elephant: '象', horse: '馬', chariot: '車', cannon: '砲', pawn: '卒' }
+};
+
+const PIECE_VALUES = { king: 10000, advisor: 20, elephant: 20, horse: 40, chariot: 90, cannon: 45, pawn: 10 };
+
+const POSITION_BONUS = {
+    pawn: [[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[0,0,0,0,0,0,0,0,0],[1,1,1,1,1,1,1,1,1],[2,2,2,2,2,2,2,2,2],[3,4,6,8,10,8,6,4,3],[4,6,8,10,12,10,8,6,4],[5,7,9,11,13,11,9,7,5],[6,8,10,12,14,12,10,8,6],[7,9,11,13,15,13,11,9,7]],
+    horse: [[0,1,2,2,2,2,2,1,0],[1,2,4,4,4,4,4,2,1],[2,4,5,6,6,6,5,4,2],[2,4,6,7,7,7,6,4,2],[2,4,6,7,8,7,6,4,2],[2,4,6,7,8,7,6,4,2],[2,4,6,7,7,7,6,4,2],[2,4,5,6,6,6,5,4,2],[1,2,4,4,4,4,4,2,1],[0,1,2,2,2,2,2,1,0]],
+    cannon: [[4,4,4,4,6,4,4,4,4],[4,5,5,5,6,5,5,5,4],[4,5,6,6,7,6,6,5,4],[4,5,6,7,8,7,6,5,4],[4,5,6,7,8,7,6,5,4],[4,5,6,7,8,7,6,5,4],[4,5,6,7,8,7,6,5,4],[4,5,6,6,7,6,6,5,4],[4,5,5,5,6,5,5,5,4],[4,4,4,4,6,4,4,4,4]],
+    chariot: [[6,6,6,8,10,8,6,6,6],[6,8,8,9,10,9,8,8,6],[6,8,8,9,10,9,8,8,6],[6,8,8,9,10,9,8,8,6],[8,10,10,10,12,10,10,10,8],[8,10,10,10,12,10,10,10,8],[6,8,8,9,10,9,8,8,6],[6,8,8,9,10,9,8,8,6],[6,8,8,9,10,9,8,8,6],[6,6,6,8,10,8,6,6,6]]
+};
+
+// ==================== 游戏状态类 ====================
+class GameState {
+    constructor() { this.reset(); }
+    
+    reset() {
+        this.board = this.createInitialBoard();
+        this.currentPlayer = 'red';
+        this.selectedPiece = null;
+        this.moveHistory = [];
+        this.capturedPieces = { red: [], black: [] };
+        this.isGameOver = false;
+        this.winner = null;
+        this.inCheck = false;
+        this.lastMove = null;
+    }
+
+    createInitialBoard() {
+        const board = Array(BOARD_HEIGHT).fill(null).map(() => Array(BOARD_WIDTH).fill(null));
+        // 黑方
+        board[0][0] = { type: PIECES.CHARIOT, color: 'black' };
+        board[0][1] = { type: PIECES.HORSE, color: 'black' };
+        board[0][2] = { type: PIECES.ELEPHANT, color: 'black' };
+        board[0][3] = { type: PIECES.ADVISOR, color: 'black' };
+        board[0][4] = { type: PIECES.KING, color: 'black' };
+        board[0][5] = { type: PIECES.ADVISOR, color: 'black' };
+        board[0][6] = { type: PIECES.ELEPHANT, color: 'black' };
+        board[0][7] = { type: PIECES.HORSE, color: 'black' };
+        board[0][8] = { type: PIECES.CHARIOT, color: 'black' };
+        board[2][1] = { type: PIECES.CANNON, color: 'black' };
+        board[2][7] = { type: PIECES.CANNON, color: 'black' };
+        board[3][0] = { type: PIECES.PAWN, color: 'black' };
+        board[3][2] = { type: PIECES.PAWN, color: 'black' };
+        board[3][4] = { type: PIECES.PAWN, color: 'black' };
+        board[3][6] = { type: PIECES.PAWN, color: 'black' };
+        board[3][8] = { type: PIECES.PAWN, color: 'black' };
+        // 红方
+        board[9][0] = { type: PIECES.CHARIOT, color: 'red' };
+        board[9][1] = { type: PIECES.HORSE, color: 'red' };
+        board[9][2] = { type: PIECES.ELEPHANT, color: 'red' };
+        board[9][3] = { type: PIECES.ADVISOR, color: 'red' };
+        board[9][4] = { type: PIECES.KING, color: 'red' };
+        board[9][5] = { type: PIECES.ADVISOR, color: 'red' };
+        board[9][6] = { type: PIECES.ELEPHANT, color: 'red' };
+        board[9][7] = { type: PIECES.HORSE, color: 'red' };
+        board[9][8] = { type: PIECES.CHARIOT, color: 'red' };
+        board[7][1] = { type: PIECES.CANNON, color: 'red' };
+        board[7][7] = { type: PIECES.CANNON, color: 'red' };
+        board[6][0] = { type: PIECES.PAWN, color: 'red' };
+        board[6][2] = { type: PIECES.PAWN, color: 'red' };
+        board[6][4] = { type: PIECES.PAWN, color: 'red' };
+        board[6][6] = { type: PIECES.PAWN, color: 'red' };
+        board[6][8] = { type: PIECES.PAWN, color: 'red' };
+        return board;
+    }
+
+    clone() {
+        const newState = new GameState();
+        newState.board = this.board.map(row => row.map(cell => cell ? {...cell} : null));
+        newState.currentPlayer = this.currentPlayer;
+        newState.moveHistory = [...this.moveHistory];
+        newState.capturedPieces = { red: [...this.capturedPieces.red], black: [...this.capturedPieces.black] };
+        newState.isGameOver = this.isGameOver;
+        newState.winner = this.winner;
+        newState.inCheck = this.inCheck;
+        newState.lastMove = this.lastMove ? {...this.lastMove} : null;
+        return newState;
+    }
+
+    getPiece(x, y) {
+        if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) return null;
+        return this.board[y][x];
+    }
+
+    setPiece(x, y, piece) {
+        if (x >= 0 && x < BOARD_WIDTH && y >= 0 && y < BOARD_HEIGHT) {
+            this.board[y][x] = piece;
+        }
+    }
+}
+
+// ==================== 走法验证类 ====================
+class MoveValidator {
+    static getValidMoves(state, x, y) {
+        const piece = state.getPiece(x, y);
+        if (!piece) return [];
+        let moves = [];
+        switch (piece.type) {
+            case PIECES.KING: moves = this.getKingMoves(state, x, y, piece.color); break;
+            case PIECES.ADVISOR: moves = this.getAdvisorMoves(state, x, y, piece.color); break;
+            case PIECES.ELEPHANT: moves = this.getElephantMoves(state, x, y, piece.color); break;
+            case PIECES.HORSE: moves = this.getHorseMoves(state, x, y, piece.color); break;
+            case PIECES.CHARIOT: moves = this.getChariotMoves(state, x, y, piece.color); break;
+            case PIECES.CANNON: moves = this.getCannonMoves(state, x, y, piece.color); break;
+            case PIECES.PAWN: moves = this.getPawnMoves(state, x, y, piece.color); break;
+        }
+        return moves.filter(move => {
+            const testState = state.clone();
+            testState.setPiece(move.x, move.y, testState.getPiece(x, y));
+            testState.setPiece(x, y, null);
+            return !this.isKingInCheck(testState, piece.color);
+        });
+    }
+
+    static getKingMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [[0,1], [0,-1], [1,0], [-1,0]];
+        const palace = color === 'red' ? { minX: 3, maxX: 5, minY: 7, maxY: 9 } : { minX: 3, maxX: 5, minY: 0, maxY: 2 };
+        for (const [dx, dy] of directions) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= palace.minX && nx <= palace.maxX && ny >= palace.minY && ny <= palace.maxY) {
+                const target = state.getPiece(nx, ny);
+                if (!target || target.color !== color) moves.push({ x: nx, y: ny, capture: !!target });
+            }
+        }
+        const enemyColor = color === 'red' ? 'black' : 'red';
+        const direction = color === 'red' ? -1 : 1;
+        for (let ny = y + direction; ny >= 0 && ny < BOARD_HEIGHT; ny += direction) {
+            const piece = state.getPiece(x, ny);
+            if (piece) {
+                if (piece.type === PIECES.KING && piece.color === enemyColor) moves.push({ x: x, y: ny, capture: true });
+                break;
+            }
+        }
+        return moves;
+    }
+
+    static getAdvisorMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [[1,1], [1,-1], [-1,1], [-1,-1]];
+        const palace = color === 'red' ? { minX: 3, maxX: 5, minY: 7, maxY: 9 } : { minX: 3, maxX: 5, minY: 0, maxY: 2 };
+        for (const [dx, dy] of directions) {
+            const nx = x + dx, ny = y + dy;
+            if (nx >= palace.minX && nx <= palace.maxX && ny >= palace.minY && ny <= palace.maxY) {
+                const target = state.getPiece(nx, ny);
+                if (!target || target.color !== color) moves.push({ x: nx, y: ny, capture: !!target });
+            }
+        }
+        return moves;
+    }
+
+    static getElephantMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [[2,2], [2,-2], [-2,2], [-2,-2]];
+        for (const [dx, dy] of directions) {
+            const nx = x + dx, ny = y + dy;
+            const blockX = x + dx/2, blockY = y + dy/2;
+            const crossRiver = color === 'red' ? ny < 5 : ny > 4;
+            if (crossRiver) continue;
+            if (state.getPiece(blockX, blockY)) continue;
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+                const target = state.getPiece(nx, ny);
+                if (!target || target.color !== color) moves.push({ x: nx, y: ny, capture: !!target });
+            }
+        }
+        return moves;
+    }
+
+    static getHorseMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [
+            { dx: 1, dy: 2, blockX: 0, blockY: 1 }, { dx: 1, dy: -2, blockX: 0, blockY: -1 },
+            { dx: -1, dy: 2, blockX: 0, blockY: 1 }, { dx: -1, dy: -2, blockX: 0, blockY: -1 },
+            { dx: 2, dy: 1, blockX: 1, blockY: 0 }, { dx: 2, dy: -1, blockX: 1, blockY: 0 },
+            { dx: -2, dy: 1, blockX: -1, blockY: 0 }, { dx: -2, dy: -1, blockX: -1, blockY: 0 }
+        ];
+        for (const dir of directions) {
+            const nx = x + dir.dx, ny = y + dir.dy;
+            if (state.getPiece(x + dir.blockX, y + dir.blockY)) continue;
+            if (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+                const target = state.getPiece(nx, ny);
+                if (!target || target.color !== color) moves.push({ x: nx, y: ny, capture: !!target });
+            }
+        }
+        return moves;
+    }
+
+    static getChariotMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [[0,1], [0,-1], [1,0], [-1,0]];
+        for (const [dx, dy] of directions) {
+            let nx = x + dx, ny = y + dy;
+            while (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+                const target = state.getPiece(nx, ny);
+                if (!target) { moves.push({ x: nx, y: ny, capture: false }); }
+                else { if (target.color !== color) moves.push({ x: nx, y: ny, capture: true }); break; }
+                nx += dx; ny += dy;
+            }
+        }
+        return moves;
+    }
+
+    static getCannonMoves(state, x, y, color) {
+        const moves = [];
+        const directions = [[0,1], [0,-1], [1,0], [-1,0]];
+        for (const [dx, dy] of directions) {
+            let nx = x + dx, ny = y + dy, jumped = false;
+            while (nx >= 0 && nx < BOARD_WIDTH && ny >= 0 && ny < BOARD_HEIGHT) {
+                const target = state.getPiece(nx, ny);
+                if (!jumped) {
+                    if (!target) moves.push({ x: nx, y: ny, capture: false });
+                    else jumped = true;
+                } else {
+                    if (target) { if (target.color !== color) moves.push({ x: nx, y: ny, capture: true }); break; }
+                }
+                nx += dx; ny += dy;
+            }
+        }
+        return moves;
+    }
+
+    static getPawnMoves(state, x, y, color) {
+        const moves = [];
+        const forward = color === 'red' ? -1 : 1;
+        const crossed = color === 'red' ? y <= 4 : y >= 5;
+        const ny = y + forward;
+        if (ny >= 0 && ny < BOARD_HEIGHT) {
+            const target = state.getPiece(x, ny);
+            if (!target || target.color !== color) moves.push({ x: x, y: ny, capture: !!target });
+        }
+        if (crossed) {
+            for (const dx of [-1, 1]) {
+                const nx = x + dx;
+                if (nx >= 0 && nx < BOARD_WIDTH) {
+                    const target = state.getPiece(nx, y);
+                    if (!target || target.color !== color) moves.push({ x: nx, y: y, capture: !!target });
+                }
+            }
+        }
+        return moves;
+    }
+
+    static findKing(state, color) {
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = state.getPiece(x, y);
+                if (piece && piece.type === PIECES.KING && piece.color === color) return { x, y };
+            }
+        }
+        return null;
+    }
+
+    static isKingInCheck(state, color) {
+        const kingPos = this.findKing(state, color);
+        if (!kingPos) return true;
+        const enemyColor = color === 'red' ? 'black' : 'red';
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = state.getPiece(x, y);
+                if (piece && piece.color === enemyColor) {
+                    const moves = this.getRawMoves(state, x, y, piece);
+                    if (moves.some(m => m.x === kingPos.x && m.y === kingPos.y)) return true;
+                }
+            }
+        }
+        const enemyKingPos = this.findKing(state, enemyColor);
+        if (enemyKingPos && kingPos.x === enemyKingPos.x) {
+            let blocked = false;
+            const minY = Math.min(kingPos.y, enemyKingPos.y);
+            const maxY = Math.max(kingPos.y, enemyKingPos.y);
+            for (let y = minY + 1; y < maxY; y++) { if (state.getPiece(kingPos.x, y)) { blocked = true; break; } }
+            if (!blocked) return true;
+        }
+        return false;
+    }
+
+    static getRawMoves(state, x, y, piece) {
+        switch (piece.type) {
+            case PIECES.KING: return this.getKingMoves(state, x, y, piece.color);
+            case PIECES.ADVISOR: return this.getAdvisorMoves(state, x, y, piece.color);
+            case PIECES.ELEPHANT: return this.getElephantMoves(state, x, y, piece.color);
+            case PIECES.HORSE: return this.getHorseMoves(state, x, y, piece.color);
+            case PIECES.CHARIOT: return this.getChariotMoves(state, x, y, piece.color);
+            case PIECES.CANNON: return this.getCannonMoves(state, x, y, piece.color);
+            case PIECES.PAWN: return this.getPawnMoves(state, x, y, piece.color);
+            default: return [];
+        }
+    }
+
+    static isCheckmate(state, color) {
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = state.getPiece(x, y);
+                if (piece && piece.color === color) {
+                    if (this.getValidMoves(state, x, y).length > 0) return false;
+                }
+            }
+        }
+        return true;
+    }
+}
+
+// ==================== AI 引擎类 ====================
+class ChessAI {
+    constructor(difficulty = 2) {
+        this.difficulty = difficulty;
+        this.maxDepth = difficulty + 1;
+    }
+
+    setDifficulty(level) { this.difficulty = level; this.maxDepth = level + 1; }
+
+    getBestMove(state) {
+        const color = state.currentPlayer;
+        const moves = this.getAllMoves(state, color);
+        if (moves.length === 0) return null;
+        if (this.difficulty === 1) {
+            const goodMoves = moves.filter(m => m.capture);
+            if (goodMoves.length > 0 && Math.random() > 0.5) return goodMoves[Math.floor(Math.random() * goodMoves.length)];
+            return moves[Math.floor(Math.random() * moves.length)];
+        }
+        let bestScore = -Infinity, bestMoves = [];
+        for (const move of moves) {
+            const newState = this.makeMove(state.clone(), move);
+            const score = -this.negamax(newState, this.maxDepth - 1, -Infinity, Infinity, color === 'red' ? 'black' : 'red');
+            if (score > bestScore) { bestScore = score; bestMoves = [move]; }
+            else if (score === bestScore) bestMoves.push(move);
+        }
+        return bestMoves[Math.floor(Math.random() * bestMoves.length)];
+    }
+
+    negamax(state, depth, alpha, beta, color) {
+        if (depth === 0 || state.isGameOver) return this.evaluate(state, color);
+        const moves = this.getAllMoves(state, color);
+        if (moves.length === 0) return MoveValidator.isKingInCheck(state, color) ? -10000 + depth : 0;
+        moves.sort((a, b) => {
+            const scoreA = a.capture ? PIECE_VALUES[state.getPiece(a.toX, a.toY)?.type || 'pawn'] : 0;
+            const scoreB = b.capture ? PIECE_VALUES[state.getPiece(b.toX, b.toY)?.type || 'pawn'] : 0;
+            return scoreB - scoreA;
+        });
+        let maxScore = -Infinity;
+        for (const move of moves) {
+            const newState = this.makeMove(state.clone(), move);
+            const score = -this.negamax(newState, depth - 1, -beta, -alpha, color === 'red' ? 'black' : 'red');
+            maxScore = Math.max(maxScore, score);
+            alpha = Math.max(alpha, score);
+            if (alpha >= beta) break;
+        }
+        return maxScore;
+    }
+
+    evaluate(state, color) {
+        let score = 0;
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = state.getPiece(x, y);
+                if (!piece) continue;
+                let pieceScore = PIECE_VALUES[piece.type];
+                const posBonus = POSITION_BONUS[piece.type];
+                if (posBonus) { const py = piece.color === 'red' ? 9 - y : y; pieceScore += posBonus[py][x]; }
+                if (piece.type === PIECES.PAWN) {
+                    const crossed = piece.color === 'red' ? y <= 4 : y >= 5;
+                    if (crossed) pieceScore += 10;
+                }
+                score += piece.color === color ? pieceScore : -pieceScore;
+            }
+        }
+        const enemyColor = color === 'red' ? 'black' : 'red';
+        if (MoveValidator.isKingInCheck(state, enemyColor)) score += 50;
+        return score;
+    }
+
+    getAllMoves(state, color) {
+        const moves = [];
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = state.getPiece(x, y);
+                if (piece && piece.color === color) {
+                    const validMoves = MoveValidator.getValidMoves(state, x, y);
+                    for (const move of validMoves) moves.push({ fromX: x, fromY: y, toX: move.x, toY: move.y, capture: move.capture });
+                }
+            }
+        }
+        return moves;
+    }
+
+    makeMove(state, move) {
+        const piece = state.getPiece(move.fromX, move.fromY);
+        const captured = state.getPiece(move.toX, move.toY);
+        state.setPiece(move.toX, move.toY, piece);
+        state.setPiece(move.fromX, move.fromY, null);
+        if (captured && captured.type === PIECES.KING) { state.isGameOver = true; state.winner = piece.color; }
+        return state;
+    }
+}
+
+// ==================== 游戏控制器类 ====================
+class ChessGame {
+    constructor() {
+        this.state = new GameState();
+        this.ai = new ChessAI(2);
+        this.gameMode = 'pvp';
+        this.playerColor = 'red';
+        this.pieceElements = new Map();
+        this.validMoveIndicators = [];
+        this.isDragging = false;
+        this.dragPiece = null;
+        this.isReplaying = false;
+        this.replayIndex = 0;
+        this.replayHistory = [];
+        this.hintShown = false;
+        this.initDOM();
+        this.initEventListeners();
+        this.render();
+    }
+
+    initDOM() {
+        this.boardEl = document.getElementById('chessboard');
+        this.statusEl = document.getElementById('gameStatus');
+        this.moveHistoryEl = document.getElementById('moveHistory');
+        this.redCapturedEl = document.getElementById('redCaptured');
+        this.blackCapturedEl = document.getElementById('blackCaptured');
+        this.redPlayerEl = document.getElementById('redPlayer');
+        this.blackPlayerEl = document.getElementById('blackPlayer');
+        this.loadingEl = document.getElementById('loading');
+        this.modal = document.getElementById('gameOverModal');
+        this.modalTitle = document.getElementById('modalTitle');
+        this.modalMessage = document.getElementById('modalMessage');
+        this.tooltip = document.getElementById('tooltip');
+        this.replayControls = document.getElementById('replayControls');
+        this.replayProgress = document.getElementById('replayProgress');
+        this.difficultyGroup = document.getElementById('difficultyGroup');
+    }
+
+    initEventListeners() {
+        document.querySelectorAll('.mode-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.mode-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.gameMode = e.target.dataset.mode;
+                this.difficultyGroup.style.display = this.gameMode === 'pve' ? 'block' : 'none';
+                document.getElementById('blackName').textContent = this.gameMode === 'pve' ? 'AI' : '黑方';
+            });
+        });
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                document.querySelectorAll('.diff-btn').forEach(b => b.classList.remove('active'));
+                e.target.classList.add('active');
+                this.ai.setDifficulty(parseInt(e.target.dataset.level));
+            });
+        });
+        document.getElementById('btnNewGame').addEventListener('click', () => this.newGame());
+        document.getElementById('btnUndo').addEventListener('click', () => this.undo());
+        document.getElementById('btnHint').addEventListener('click', () => this.showHint());
+        document.getElementById('btnReplay').addEventListener('click', () => this.startReplay());
+        document.getElementById('btnSave').addEventListener('click', () => this.saveGame());
+        document.getElementById('btnLoad').addEventListener('click', () => document.getElementById('fileInput').click());
+        document.getElementById('fileInput').addEventListener('change', (e) => this.loadGame(e));
+        document.getElementById('btnPlayAgain').addEventListener('click', () => { this.modal.classList.remove('show'); this.newGame(); });
+        document.getElementById('btnCloseModal').addEventListener('click', () => this.modal.classList.remove('show'));
+        document.getElementById('replayStart').addEventListener('click', () => this.replayGoto(0));
+        document.getElementById('replayPrev').addEventListener('click', () => this.replayStep(-1));
+        document.getElementById('replayNext').addEventListener('click', () => this.replayStep(1));
+        document.getElementById('replayEnd').addEventListener('click', () => this.replayGoto(this.replayHistory.length));
+        document.getElementById('replayExit').addEventListener('click', () => this.exitReplay());
+        this.boardEl.addEventListener('click', (e) => this.handleBoardClick(e));
+        this.boardEl.addEventListener('mousedown', (e) => this.handleDragStart(e));
+        document.addEventListener('mousemove', (e) => this.handleDragMove(e));
+        document.addEventListener('mouseup', (e) => this.handleDragEnd(e));
+        this.boardEl.addEventListener('touchstart', (e) => this.handleTouchStart(e), { passive: false });
+        document.addEventListener('touchmove', (e) => this.handleTouchMove(e), { passive: false });
+        document.addEventListener('touchend', (e) => this.handleTouchEnd(e));
+    }
+
+    boardToPixel(x, y) { return { px: x * CELL_SIZE + PIECE_OFFSET, py: y * CELL_SIZE + PIECE_OFFSET }; }
+    
+    pixelToBoard(px, py) {
+        const rect = this.boardEl.getBoundingClientRect();
+        return { x: Math.round((px - rect.left - PIECE_OFFSET) / CELL_SIZE), y: Math.round((py - rect.top - PIECE_OFFSET) / CELL_SIZE) };
+    }
+
+    render() {
+        this.pieceElements.forEach(el => el.remove());
+        this.pieceElements.clear();
+        this.clearValidMoveIndicators();
+        for (let y = 0; y < BOARD_HEIGHT; y++) {
+            for (let x = 0; x < BOARD_WIDTH; x++) {
+                const piece = this.state.getPiece(x, y);
+                if (piece) this.createPieceElement(x, y, piece);
+            }
+        }
+        this.updateStatus();
+        this.updateCapturedPieces();
+        this.updateMoveHistory();
+        this.updatePlayerIndicators();
+    }
+
+    createPieceElement(x, y, piece) {
+        const el = document.createElement('div');
+        el.className = `piece ${piece.color}`;
+        el.textContent = PIECE_NAMES[piece.color][piece.type];
+        el.dataset.x = x;
+        el.dataset.y = y;
+        const pos = this.boardToPixel(x, y);
+        el.style.left = (pos.px - 23) + 'px';
+        el.style.top = (pos.py - 23) + 'px';
+        if (this.state.lastMove && ((x === this.state.lastMove.toX && y === this.state.lastMove.toY) || (x === this.state.lastMove.fromX && y === this.state.lastMove.fromY))) {
+            el.classList.add('last-move');
+        }
+        if (piece.type === PIECES.KING && this.state.inCheck && piece.color === this.state.currentPlayer) {
+            el.classList.add('in-check');
+        }
+        this.boardEl.appendChild(el);
+        this.pieceElements.set(`${x},${y}`, el);
+    }
+
+    handleBoardClick(e) {
+        if (this.isReplaying || this.state.isGameOver || this.isDragging) return;
+        if (!e.target.classList.contains('piece') && e.target.id !== 'chessboard') return;
+        const coords = this.pixelToBoard(e.clientX, e.clientY);
+        this.handleMove(coords.x, coords.y);
+    }
+
+    handleMove(x, y) {
+        if (x < 0 || x >= BOARD_WIDTH || y < 0 || y >= BOARD_HEIGHT) return;
+        const clickedPiece = this.state.getPiece(x, y);
+        if (this.state.selectedPiece) {
+            const { x: fromX, y: fromY } = this.state.selectedPiece;
+            const validMoves = MoveValidator.getValidMoves(this.state, fromX, fromY);
+            const validMove = validMoves.find(m => m.x === x && m.y === y);
+            if (validMove) { this.executeMove(fromX, fromY, x, y); return; }
+            else if (clickedPiece && clickedPiece.color === this.state.currentPlayer) { this.selectPiece(x, y); return; }
+            this.deselectPiece(); return;
+        }
+        if (clickedPiece && clickedPiece.color === this.state.currentPlayer) {
+            if (this.gameMode === 'pve' && clickedPiece.color !== this.playerColor) return;
+            this.selectPiece(x, y);
+        }
+    }
+
+    selectPiece(x, y) {
+        this.deselectPiece();
+        this.state.selectedPiece = { x, y };
+        const el = this.pieceElements.get(`${x},${y}`);
+        if (el) el.classList.add('selected');
+        this.showValidMoves(MoveValidator.getValidMoves(this.state, x, y));
+    }
+
+    deselectPiece() {
+        if (this.state.selectedPiece) {
+            const el = this.pieceElements.get(`${this.state.selectedPiece.x},${this.state.selectedPiece.y}`);
+            if (el) el.classList.remove('selected');
+        }
+        this.state.selectedPiece = null;
+        this.clearValidMoveIndicators();
+    }
+
+    showValidMoves(moves) {
+        this.clearValidMoveIndicators();
+        for (const move of moves) {
+            const indicator = document.createElement('div');
+            indicator.className = 'valid-move-indicator' + (move.capture ? ' capture' : '');
+            const pos = this.boardToPixel(move.x, move.y);
+            indicator.style.left = pos.px + 'px';
+            indicator.style.top = pos.py + 'px';
+            this.boardEl.appendChild(indicator);
+            this.validMoveIndicators.push(indicator);
+        }
+    }
+
+    clearValidMoveIndicators() { this.validMoveIndicators.forEach(el => el.remove()); this.validMoveIndicators = []; }
+
+    executeMove(fromX, fromY, toX, toY, skipAI = false) {
+        const piece = this.state.getPiece(fromX, fromY);
+        const captured = this.state.getPiece(toX, toY);
+        this.state.moveHistory.push({ fromX, fromY, toX, toY, piece: { ...piece }, captured: captured ? { ...captured } : null, inCheck: this.state.inCheck });
+        const pieceEl = this.pieceElements.get(`${fromX},${fromY}`);
+        if (pieceEl) {
+            pieceEl.classList.add('piece-move-animation');
+            const pos = this.boardToPixel(toX, toY);
+            pieceEl.style.left = (pos.px - 23) + 'px';
+            pieceEl.style.top = (pos.py - 23) + 'px';
+        }
+        if (captured) {
+            const capturedEl = this.pieceElements.get(`${toX},${toY}`);
+            if (capturedEl) { capturedEl.style.transform = 'scale(0)'; capturedEl.style.opacity = '0'; setTimeout(() => capturedEl.remove(), 300); }
+            this.state.capturedPieces[piece.color].push(captured);
+            if (captured.type === PIECES.KING) { this.state.isGameOver = true; this.state.winner = piece.color; }
+        }
+        this.state.setPiece(toX, toY, piece);
+        this.state.setPiece(fromX, fromY, null);
+        this.state.lastMove = { fromX, fromY, toX, toY };
+        this.pieceElements.delete(`${fromX},${fromY}`);
+        if (pieceEl) { pieceEl.dataset.x = toX; pieceEl.dataset.y = toY; this.pieceElements.set(`${toX},${toY}`, pieceEl); }
+        this.state.currentPlayer = this.state.currentPlayer === 'red' ? 'black' : 'red';
+        this.state.inCheck = MoveValidator.isKingInCheck(this.state, this.state.currentPlayer);
+        if (MoveValidator.isCheckmate(this.state, this.state.currentPlayer)) {
+            this.state.isGameOver = true;
+            this.state.winner = this.state.currentPlayer === 'red' ? 'black' : 'red';
+        }
+        this.deselectPiece();
+        this.render();
+        if (this.state.isGameOver) { this.showGameOver(); return; }
+        if (!skipAI && this.gameMode === 'pve' && this.state.currentPlayer !== this.playerColor) this.doAIMove();
+    }
+
+    doAIMove() {
+        this.loadingEl.classList.add('show');
+        setTimeout(() => {
+            const move = this.ai.getBestMove(this.state);
+            this.loadingEl.classList.remove('show');
+            if (move) this.executeMove(move.fromX, move.fromY, move.toX, move.toY, true);
+        }, 300);
+    }
+
+    handleDragStart(e) {
+        if (this.isReplaying || this.state.isGameOver) return;
+        const target = e.target;
+        if (!target.classList.contains('piece')) return;
+        const x = parseInt(target.dataset.x), y = parseInt(target.dataset.y);
+        const piece = this.state.getPiece(x, y);
+        if (!piece || piece.color !== this.state.currentPlayer) return;
+        if (this.gameMode === 'pve' && piece.color !== this.playerColor) return;
+        this.isDragging = true;
+        this.dragPiece = { x, y, element: target };
+        target.classList.add('dragging');
+        this.selectPiece(x, y);
+        e.preventDefault();
+    }
+
+    handleDragMove(e) {
+        if (!this.isDragging || !this.dragPiece) return;
+        const rect = this.boardEl.getBoundingClientRect();
+        this.dragPiece.element.style.left = (e.clientX - rect.left - 23) + 'px';
+        this.dragPiece.element.style.top = (e.clientY - rect.top - 23) + 'px';
+    }
+
+    handleDragEnd(e) {
+        if (!this.isDragging || !this.dragPiece) return;
+        const coords = this.pixelToBoard(e.clientX, e.clientY);
+        const { x: fromX, y: fromY } = this.dragPiece;
+        this.dragPiece.element.classList.remove('dragging');
+        const validMoves = MoveValidator.getValidMoves(this.state, fromX, fromY);
+        if (validMoves.find(m => m.x === coords.x && m.y === coords.y)) this.executeMove(fromX, fromY, coords.x, coords.y);
+        else {
+            const pos = this.boardToPixel(fromX, fromY);
+            this.dragPiece.element.style.left = (pos.px - 23) + 'px';
+            this.dragPiece.element.style.top = (pos.py - 23) + 'px';
+            this.deselectPiece();
+        }
+        this.isDragging = false;
+        this.dragPiece = null;
+    }
+
+    handleTouchStart(e) {
+        if (e.touches.length === 1) {
+            const touch = e.touches[0];
+            this.handleDragStart({ target: document.elementFromPoint(touch.clientX, touch.clientY), clientX: touch.clientX, clientY: touch.clientY, preventDefault: () => e.preventDefault() });
+        }
+    }
+
+    handleTouchMove(e) {
+        if (e.touches.length === 1 && this.isDragging) {
+            this.handleDragMove({ clientX: e.touches[0].clientX, clientY: e.touches[0].clientY });
+            e.preventDefault();
+        }
+    }
+
+    handleTouchEnd(e) {
+        if (this.isDragging) this.handleDragEnd({ clientX: e.changedTouches[0].clientX, clientY: e.changedTouches[0].clientY });
+    }
+
+    updateStatus() {
+        if (this.state.isGameOver) { this.statusEl.textContent = `${this.state.winner === 'red' ? '红方' : '黑方'}获胜！`; this.statusEl.className = 'status-text'; }
+        else if (this.state.inCheck) { this.statusEl.textContent = `将军！${this.state.currentPlayer === 'red' ? '红方' : '黑方'}请应将`; this.statusEl.className = 'status-text check'; }
+        else { this.statusEl.textContent = `${this.state.currentPlayer === 'red' ? '红方' : '黑方'}走棋`; this.statusEl.className = 'status-text'; }
+    }
+
+    updateCapturedPieces() {
+        this.redCapturedEl.innerHTML = this.state.capturedPieces.red.map(p => `<span class="captured-piece" style="color:#333;">${PIECE_NAMES.black[p.type]}</span>`).join('');
+        this.blackCapturedEl.innerHTML = this.state.capturedPieces.black.map(p => `<span class="captured-piece" style="color:#c41e3a;">${PIECE_NAMES.red[p.type]}</span>`).join('');
+    }
+
+    updateMoveHistory() {
+        if (this.state.moveHistory.length === 0) { this.moveHistoryEl.innerHTML = '<div class="move-record" style="color:#666;text-align:center;">暂无记录</div>'; return; }
+        let html = '';
+        for (let i = 0; i < this.state.moveHistory.length; i += 2) {
+            const redMove = this.state.moveHistory[i], blackMove = this.state.moveHistory[i + 1];
+            html += `<div class="move-record"><span class="move-number">${Math.floor(i/2)+1}.</span><span class="move-red">${this.formatMove(redMove)}</span><span class="move-black">${blackMove ? this.formatMove(blackMove) : ''}</span></div>`;
+        }
+        this.moveHistoryEl.innerHTML = html;
+        this.moveHistoryEl.scrollTop = this.moveHistoryEl.scrollHeight;
+    }
+
+    formatMove(move) {
+        const piece = move.piece, name = PIECE_NAMES[piece.color][piece.type];
+        const cols = ['九','八','七','六','五','四','三','二','一'];
+        const colFrom = piece.color === 'red' ? cols[move.fromX] : (move.fromX + 1).toString();
+        const colTo = piece.color === 'red' ? cols[move.toX] : (move.toX + 1).toString();
+        let direction = move.fromY === move.toY ? '平' : ((piece.color === 'red' && move.toY < move.fromY) || (piece.color === 'black' && move.toY > move.fromY)) ? '进' : '退';
+        let steps = move.fromX !== move.toX ? colTo : (piece.color === 'red' ? ['一','二','三','四','五','六','七','八','九'][Math.abs(move.toY - move.fromY) - 1] : Math.abs(move.toY - move.fromY).toString());
+        return `${name}${colFrom}${direction}${steps}`;
+    }
+
+    updatePlayerIndicators() {
+        this.redPlayerEl.classList.toggle('active', this.state.currentPlayer === 'red');
+        this.blackPlayerEl.classList.toggle('active', this.state.currentPlayer === 'black');
+    }
+
+    newGame() { this.state.reset(); this.isReplaying = false; this.replayControls.classList.remove('show'); this.render(); }
+
+    undo() {
+        if (this.state.moveHistory.length === 0 || this.isReplaying) return;
+        const steps = this.gameMode === 'pve' && this.state.moveHistory.length >= 2 ? 2 : 1;
+        for (let i = 0; i < steps && this.state.moveHistory.length > 0; i++) {
+            const move = this.state.moveHistory.pop();
+            this.state.setPiece(move.fromX, move.fromY, move.piece);
+            this.state.setPiece(move.toX, move.toY, move.captured);
+            if (move.captured) this.state.capturedPieces[move.piece.color].pop();
+            this.state.currentPlayer = move.piece.color;
+            this.state.inCheck = move.inCheck;
+        }
+        this.state.isGameOver = false; this.state.winner = null;
+        this.state.lastMove = this.state.moveHistory.length > 0 ? this.state.moveHistory[this.state.moveHistory.length - 1] : null;
+        this.render();
+    }
+
+    showHint() {
+        if (this.state.isGameOver || this.isReplaying || this.hintShown) return;
+        const move = this.ai.getBestMove(this.state);
+        if (move) {
+            this.selectPiece(move.fromX, move.fromY);
+            const targetEl = document.createElement('div');
+            targetEl.className = 'valid-move-indicator';
+            targetEl.style.background = 'rgba(255,215,0,0.6)';
+            targetEl.style.width = '30px'; targetEl.style.height = '30px';
+            const pos = this.boardToPixel(move.toX, move.toY);
+            targetEl.style.left = pos.px + 'px'; targetEl.style.top = pos.py + 'px';
+            this.boardEl.appendChild(targetEl);
+            this.validMoveIndicators.push(targetEl);
+            this.hintShown = true;
+            setTimeout(() => { this.hintShown = false; }, 3000);
+        }
+    }
+
+    startReplay() {
+        if (this.state.moveHistory.length === 0) { this.showTooltip('暂无棋局记录可回放'); return; }
+        this.isReplaying = true; this.replayHistory = [...this.state.moveHistory]; this.replayIndex = 0;
+        this.state.reset(); this.render();
+        this.replayControls.classList.add('show'); this.updateReplayProgress();
+    }
+
+    replayStep(direction) {
+        if (!this.isReplaying) return;
+        if (direction > 0 && this.replayIndex < this.replayHistory.length) {
+            const move = this.replayHistory[this.replayIndex];
+            const piece = this.state.getPiece(move.fromX, move.fromY);
+            const captured = this.state.getPiece(move.toX, move.toY);
+            if (captured) this.state.capturedPieces[piece.color].push(captured);
+            this.state.setPiece(move.toX, move.toY, piece);
+            this.state.setPiece(move.fromX, move.fromY, null);
+            this.state.lastMove = { fromX: move.fromX, fromY: move.fromY, toX: move.toX, toY: move.toY };
+            this.state.currentPlayer = this.state.currentPlayer === 'red' ? 'black' : 'red';
+            this.replayIndex++; this.render();
+        } else if (direction < 0 && this.replayIndex > 0) {
+            this.replayIndex--; this.state.reset();
+            for (let i = 0; i < this.replayIndex; i++) {
+                const move = this.replayHistory[i];
+                const piece = this.state.getPiece(move.fromX, move.fromY);
+                const captured = this.state.getPiece(move.toX, move.toY);
+                this.state.setPiece(move.toX, move.toY, piece);
+                this.state.setPiece(move.fromX, move.fromY, null);
+                if (captured) this.state.capturedPieces[piece.color].push(captured);
+                this.state.currentPlayer = this.state.currentPlayer === 'red' ? 'black' : 'red';
+            }
+            this.state.lastMove = this.replayIndex > 0 ? this.replayHistory[this.replayIndex - 1] : null;
+            this.render();
+        }
+        this.updateReplayProgress();
+    }
+
+    replayGoto(index) {
+        if (!this.isReplaying) return;
+        this.state.reset(); this.replayIndex = 0;
+        for (let i = 0; i < index && i < this.replayHistory.length; i++) {
+            const move = this.replayHistory[i];
+            const piece = this.state.getPiece(move.fromX, move.fromY);
+            const captured = this.state.getPiece(move.toX, move.toY);
+            this.state.setPiece(move.toX, move.toY, piece);
+            this.state.setPiece(move.fromX, move.fromY, null);
+            if (captured) this.state.capturedPieces[piece.color].push(captured);
+            this.state.currentPlayer = this.state.currentPlayer === 'red' ? 'black' : 'red';
+            this.replayIndex++;
+        }
+        this.state.lastMove = this.replayIndex > 0 ? this.replayHistory[this.replayIndex - 1] : null;
+        this.render(); this.updateReplayProgress();
+    }
+
+    updateReplayProgress() { this.replayProgress.textContent = `${this.replayIndex}/${this.replayHistory.length}`; }
+
+    exitReplay() {
+        this.isReplaying = false; this.replayControls.classList.remove('show');
+        this.state.moveHistory = [...this.replayHistory];
+        this.replayGoto(this.replayHistory.length); this.isReplaying = false;
+    }
+
+    saveGame() {
+        const gameData = { version: '1.0', date: new Date().toISOString(), mode: this.gameMode, difficulty: this.ai.difficulty, moveHistory: this.state.moveHistory };
+        const blob = new Blob([JSON.stringify(gameData, null, 2)], { type: 'application/json' });
+        const a = document.createElement('a'); a.href = URL.createObjectURL(blob);
+        a.download = `象棋棋局_${new Date().toLocaleDateString('zh-CN')}.json`; a.click();
+        URL.revokeObjectURL(a.href); this.showTooltip('棋局已保存');
+    }
+
+    loadGame(e) {
+        const file = e.target.files[0]; if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const gameData = JSON.parse(event.target.result);
+                this.state.reset(); this.gameMode = gameData.mode || 'pvp'; this.ai.setDifficulty(gameData.difficulty || 2);
+                document.querySelectorAll('.mode-btn').forEach(btn => btn.classList.toggle('active', btn.dataset.mode === this.gameMode));
+                document.querySelectorAll('.diff-btn').forEach(btn => btn.classList.toggle('active', parseInt(btn.dataset.level) === this.ai.difficulty));
+                this.difficultyGroup.style.display = this.gameMode === 'pve' ? 'block' : 'none';
+                for (const move of gameData.moveHistory) {
+                    const piece = this.state.getPiece(move.fromX, move.fromY);
+                    const captured = this.state.getPiece(move.toX, move.toY);
+                    this.state.moveHistory.push({ ...move, piece: { ...piece }, captured: captured ? { ...captured } : null });
+                    if (captured) this.state.capturedPieces[piece.color].push(captured);
+                    this.state.setPiece(move.toX, move.toY, piece);
+                    this.state.setPiece(move.fromX, move.fromY, null);
+                    this.state.currentPlayer = this.state.currentPlayer === 'red' ? 'black' : 'red';
+                }
+                this.state.lastMove = this.state.moveHistory.length > 0 ? this.state.moveHistory[this.state.moveHistory.length - 1] : null;
+                this.state.inCheck = MoveValidator.isKingInCheck(this.state, this.state.currentPlayer);
+                this.render(); this.showTooltip('棋局已载入');
+            } catch (err) { this.showTooltip('文件格式错误'); console.error(err); }
+        };
+        reader.readAsText(file); e.target.value = '';
+    }
+
+    showGameOver() {
+        this.modalTitle.textContent = '对弈结束';
+        this.modalMessage.textContent = `${this.state.winner === 'red' ? '红方' : '黑方'}获胜！`;
+        this.modal.classList.add('show');
+    }
+
+    showTooltip(message) {
+        this.tooltip.textContent = message;
+        this.tooltip.style.left = '50%'; this.tooltip.style.top = '50%';
+        this.tooltip.style.transform = 'translate(-50%, -50%)';
+        this.tooltip.classList.add('show');
+        setTimeout(() => { this.tooltip.classList.remove('show'); }, 2000);
+    }
+}
+
+// ==================== 启动游戏 ====================
+document.addEventListener('DOMContentLoaded', () => { window.game = new ChessGame(); });
+</script></body></html>
