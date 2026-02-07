@@ -1,0 +1,1217 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Neon Grid Voyager | 3D Interactive Portfolio</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&display=swap');
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    overflow: hidden;
+    background: #000;
+    font-family: 'Rajdhani', sans-serif;
+    color: #fff;
+    cursor: none;
+  }
+
+  #canvas-container {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 1;
+  }
+
+  canvas { display: block; }
+
+  /* Custom cursor */
+  #cursor {
+    position: fixed;
+    width: 20px; height: 20px;
+    border: 2px solid #0ff;
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 9999;
+    transform: translate(-50%, -50%);
+    transition: width 0.2s, height 0.2s, border-color 0.2s;
+    mix-blend-mode: difference;
+  }
+  #cursor.hover {
+    width: 40px; height: 40px;
+    border-color: #f0f;
+  }
+
+  /* Loading screen */
+  #loading {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    background: #050510;
+    z-index: 1000;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    transition: opacity 1s ease, visibility 1s ease;
+  }
+  #loading.hidden {
+    opacity: 0;
+    visibility: hidden;
+  }
+  #loading h1 {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.8rem, 5vw, 3.5rem);
+    font-weight: 900;
+    background: linear-gradient(135deg, #0ff, #f0f, #0ff);
+    background-size: 200% 200%;
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    animation: gradShift 3s ease infinite;
+    margin-bottom: 30px;
+    letter-spacing: 4px;
+  }
+  @keyframes gradShift {
+    0%, 100% { background-position: 0% 50%; }
+    50% { background-position: 100% 50%; }
+  }
+  .loader-bar {
+    width: 300px; height: 3px;
+    background: rgba(255,255,255,0.1);
+    border-radius: 2px;
+    overflow: hidden;
+  }
+  .loader-bar-inner {
+    width: 0%; height: 100%;
+    background: linear-gradient(90deg, #0ff, #f0f);
+    border-radius: 2px;
+    transition: width 0.3s ease;
+  }
+  #loading p {
+    margin-top: 20px;
+    font-size: 0.85rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* HUD */
+  #hud {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 10;
+    pointer-events: none;
+  }
+
+  /* Speed indicator */
+  #speed-display {
+    position: fixed;
+    bottom: 30px; right: 30px;
+    z-index: 10;
+    text-align: right;
+  }
+  #speed-display .speed-val {
+    font-family: 'Orbitron', monospace;
+    font-size: 2.5rem;
+    font-weight: 900;
+    color: #0ff;
+    text-shadow: 0 0 20px rgba(0,255,255,0.5);
+    line-height: 1;
+  }
+  #speed-display .speed-unit {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 0.75rem;
+    color: rgba(255,255,255,0.4);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+  }
+
+  /* Controls hint */
+  #controls-hint {
+    position: fixed;
+    bottom: 30px; left: 30px;
+    z-index: 10;
+    opacity: 0.5;
+    transition: opacity 0.5s;
+  }
+  #controls-hint.faded { opacity: 0; }
+  .key-row { display: flex; gap: 4px; justify-content: center; margin-bottom: 4px; }
+  .key {
+    width: 36px; height: 36px;
+    border: 1px solid rgba(0,255,255,0.3);
+    border-radius: 6px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    color: rgba(0,255,255,0.6);
+    background: rgba(0,255,255,0.05);
+  }
+  .key.active {
+    background: rgba(0,255,255,0.2);
+    border-color: #0ff;
+    color: #0ff;
+    box-shadow: 0 0 10px rgba(0,255,255,0.3);
+  }
+
+  /* Minimap */
+  #minimap {
+    position: fixed;
+    top: 20px; right: 20px;
+    width: 160px; height: 160px;
+    border: 1px solid rgba(0,255,255,0.2);
+    border-radius: 12px;
+    background: rgba(5,5,16,0.8);
+    backdrop-filter: blur(10px);
+    z-index: 10;
+    overflow: hidden;
+  }
+  #minimap canvas {
+    width: 100%; height: 100%;
+  }
+
+  /* Info panel */
+  #info-panel {
+    position: fixed;
+    top: 50%; left: 50%;
+    transform: translate(-50%, -50%) scale(0.9);
+    width: min(550px, 90vw);
+    max-height: 80vh;
+    z-index: 20;
+    pointer-events: auto;
+    opacity: 0;
+    visibility: hidden;
+    transition: all 0.5s cubic-bezier(0.16, 1, 0.3, 1);
+  }
+  #info-panel.visible {
+    opacity: 1;
+    visibility: visible;
+    transform: translate(-50%, -50%) scale(1);
+  }
+  .panel-glass {
+    background: rgba(8, 8, 24, 0.85);
+    backdrop-filter: blur(20px);
+    border: 1px solid rgba(0,255,255,0.15);
+    border-radius: 20px;
+    padding: 40px;
+    position: relative;
+    overflow: hidden;
+  }
+  .panel-glass::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0;
+    width: 100%; height: 2px;
+    background: linear-gradient(90deg, transparent, #0ff, #f0f, transparent);
+  }
+  .panel-tag {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.65rem;
+    color: #f0f;
+    letter-spacing: 4px;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .panel-title {
+    font-family: 'Orbitron', monospace;
+    font-size: clamp(1.4rem, 3vw, 2rem);
+    font-weight: 900;
+    margin-bottom: 20px;
+    line-height: 1.2;
+    background: linear-gradient(135deg, #fff, #0ff);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .panel-body {
+    font-size: 1rem;
+    line-height: 1.8;
+    color: rgba(255,255,255,0.7);
+    font-weight: 400;
+  }
+  .panel-body strong {
+    color: #0ff;
+    font-weight: 600;
+  }
+  .panel-close {
+    position: absolute;
+    top: 16px; right: 16px;
+    width: 36px; height: 36px;
+    border: 1px solid rgba(255,255,255,0.15);
+    border-radius: 50%;
+    background: transparent;
+    color: #fff;
+    font-size: 1.1rem;
+    cursor: pointer;
+    pointer-events: auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+  }
+  .panel-close:hover {
+    border-color: #f0f;
+    color: #f0f;
+    box-shadow: 0 0 15px rgba(255,0,255,0.3);
+  }
+  .panel-tags-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-top: 20px;
+  }
+  .p-tag {
+    padding: 4px 14px;
+    border: 1px solid rgba(0,255,255,0.25);
+    border-radius: 20px;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.6rem;
+    color: #0ff;
+    letter-spacing: 1px;
+  }
+
+  /* Proximity indicator */
+  #proximity {
+    position: fixed;
+    bottom: 100px; left: 50%;
+    transform: translateX(-50%);
+    z-index: 15;
+    font-family: 'Orbitron', monospace;
+    font-size: 0.7rem;
+    letter-spacing: 3px;
+    color: #0ff;
+    text-transform: uppercase;
+    opacity: 0;
+    transition: opacity 0.4s;
+    text-shadow: 0 0 10px rgba(0,255,255,0.5);
+  }
+  #proximity.visible { opacity: 1; }
+
+  /* Title overlay top-left */
+  #site-title {
+    position: fixed;
+    top: 24px; left: 24px;
+    z-index: 10;
+  }
+  #site-title h2 {
+    font-family: 'Orbitron', monospace;
+    font-size: 0.75rem;
+    font-weight: 700;
+    letter-spacing: 4px;
+    color: rgba(255,255,255,0.6);
+  }
+  #site-title p {
+    font-size: 0.65rem;
+    color: rgba(255,255,255,0.25);
+    letter-spacing: 2px;
+    margin-top: 4px;
+  }
+
+  /* Scanline overlay */
+  #scanlines {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 5;
+    pointer-events: none;
+    background: repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 2px,
+      rgba(0,0,0,0.03) 2px,
+      rgba(0,0,0,0.03) 4px
+    );
+  }
+
+  /* Vignette */
+  #vignette {
+    position: fixed;
+    top: 0; left: 0;
+    width: 100%; height: 100%;
+    z-index: 4;
+    pointer-events: none;
+    background: radial-gradient(ellipse at center, transparent 50%, rgba(0,0,0,0.6) 100%);
+  }
+
+  @media (max-width: 768px) {
+    #minimap { width: 100px; height: 100px; top: 10px; right: 10px; }
+    #speed-display { bottom: 15px; right: 15px; }
+    #speed-display .speed-val { font-size: 1.8rem; }
+    #controls-hint { display: none; }
+    .panel-glass { padding: 24px; }
+  }
+</style>
+</head>
+<body>
+
+<div id="cursor"></div>
+
+<!-- Loading screen -->
+<div id="loading">
+  <h1>NEON GRID</h1>
+  <div class="loader-bar"><div class="loader-bar-inner" id="load-bar"></div></div>
+  <p>Initializing world…</p>
+</div>
+
+<!-- Scanline & vignette overlays -->
+<div id="scanlines"></div>
+<div id="vignette"></div>
+
+<!-- HUD -->
+<div id="hud">
+  <div id="site-title">
+    <h2>NEON GRID VOYAGER</h2>
+    <p>WASD / ↑↓←→ 驾驶探索</p>
+  </div>
+</div>
+
+<div id="speed-display">
+  <div class="speed-val" id="speed-val">0</div>
+  <div class="speed-unit">km/h</div>
+</div>
+
+<div id="controls-hint">
+  <div class="key-row"><div class="key" id="k-w">W</div></div>
+  <div class="key-row">
+    <div class="key" id="k-a">A</div>
+    <div class="key" id="k-s">S</div>
+    <div class="key" id="k-d">D</div>
+  </div>
+</div>
+
+<div id="minimap"><canvas id="minimap-canvas" width="160" height="160"></canvas></div>
+
+<div id="proximity">按 <strong>E</strong> 键 查看详情</div>
+
+<!-- Info Panel -->
+<div id="info-panel">
+  <div class="panel-glass">
+    <button class="panel-close" id="panel-close">✕</button>
+    <div class="panel-tag" id="panel-tag"></div>
+    <div class="panel-title" id="panel-title"></div>
+    <div class="panel-body" id="panel-body"></div>
+    <div class="panel-tags-row" id="panel-tags"></div>
+  </div>
+</div>
+
+<div id="canvas-container"></div>
+
+<!-- Three.js -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+// NEON GRID VOYAGER — 3D Interactive Portfolio
+// ══════════════════════════════════════════════════════════════
+
+// ─── Configuration ───────────────────────────────────────────
+const CONFIG = {
+  vehicle: {
+    acceleration: 0.12,
+    braking: 0.15,
+    friction: 0.96,
+    maxSpeed: 2.0,
+    turnSpeed: 0.04,
+    turnFriction: 0.92,
+  },
+  camera: {
+    height: 6,
+    distance: 12,
+    lookAhead: 6,
+    smoothing: 0.05,
+  },
+  world: {
+    gridSize: 200,
+    stationProximity: 10,
+  },
+};
+
+// ─── Station Data (展示内容) ─────────────────────────────────
+const STATIONS = [
+  {
+    id: 'about',
+    tag: '// 关于我',
+    title: '全栈开发者 & 创意工程师',
+    body: `热爱用代码创造令人惊叹的交互体验。<br><br>
+           专注于 <strong>WebGL / Three.js</strong> 3D 可视化开发，
+           同时擅长 <strong>React</strong>、<strong>Vue</strong> 等现代前端框架。<br><br>
+           相信技术与艺术的交融可以创造无限可能。目前正在探索 AI 与 3D Web 的结合。`,
+    tags: ['Three.js', 'React', 'Node.js', 'WebGL', 'Creative Coding'],
+    position: { x: 30, z: -30 },
+    color: 0x00ffff,
+    shape: 'torus',
+  },
+  {
+    id: 'projects',
+    tag: '// 项目作品',
+    title: '精选项目',
+    body: `<strong>🌌 粒子宇宙</strong> — 基于 WebGL 的百万粒子实时渲染系统，支持力场交互。<br><br>
+           <strong>🏙️ 数字孪生城市</strong> — 使用 Three.js + GIS 数据构建的城市 3D 可视化平台。<br><br>
+           <strong>🎮 物理沙盒</strong> — Cannon.js 驱动的在线物理实验场，支持多人协作。<br><br>
+           <strong>🎨 AI 画布</strong> — 将 Stable Diffusion 与 WebGL 着色器结合的实时创作工具。`,
+    tags: ['WebGL', 'GLSL', 'Physics', 'AI', 'Real-time'],
+    position: { x: -35, z: -25 },
+    color: 0xff00ff,
+    shape: 'octahedron',
+  },
+  {
+    id: 'skills',
+    tag: '// 技术栈',
+    title: '核心技能',
+    body: `<strong>3D & Graphics</strong> — Three.js · WebGL · GLSL Shaders · Blender · Cannon.js<br><br>
+           <strong>Frontend</strong> — React · Vue 3 · TypeScript · Next.js · Tailwind CSS<br><br>
+           <strong>Backend</strong> — Node.js · Python · PostgreSQL · Redis · Docker<br><br>
+           <strong>Creative</strong> — Creative Coding · Generative Art · Motion Design · Figma`,
+    tags: ['Full-Stack', '3D Graphics', 'Creative Tech', 'DevOps'],
+    position: { x: 35, z: 30 },
+    color: 0xffff00,
+    shape: 'icosahedron',
+  },
+  {
+    id: 'contact',
+    tag: '// 联系我',
+    title: '一起创造些酷东西？',
+    body: `如果你有有趣的项目或合作想法，欢迎联系！<br><br>
+           📧 <strong>hello@neon-voyager.dev</strong><br>
+           🐙 <strong>github.com/neon-voyager</strong><br>
+           🐦 <strong>@neon_voyager</strong><br><br>
+           目前开放 <strong>自由职业</strong> 和 <strong>远程全职</strong> 机会。`,
+    tags: ['Freelance', 'Remote', 'Open Source', 'Collaboration'],
+    position: { x: -30, z: 35 },
+    color: 0x00ff88,
+    shape: 'torusKnot',
+  },
+];
+
+// ─── State ───────────────────────────────────────────────────
+const keys = { w: false, a: false, s: false, d: false, e: false };
+let velocity = 0;
+let angularVelocity = 0;
+let vehicleAngle = 0;
+let nearStation = null;
+let panelOpen = false;
+let hasMovedOnce = false;
+let loadProgress = 0;
+
+// ─── Scene Setup ─────────────────────────────────────────────
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x050510, 0.012);
+scene.background = new THREE.Color(0x050510);
+
+const camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 500);
+camera.position.set(0, CONFIG.camera.height, CONFIG.camera.distance);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: false });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.2;
+document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+// ─── Lights ──────────────────────────────────────────────────
+const ambientLight = new THREE.AmbientLight(0x111122, 0.5);
+scene.add(ambientLight);
+
+const dirLight = new THREE.DirectionalLight(0x4444ff, 0.3);
+dirLight.position.set(-20, 30, 20);
+scene.add(dirLight);
+
+// ─── Ground Grid ─────────────────────────────────────────────
+function createGround() {
+  const size = CONFIG.world.gridSize;
+
+  // Ground plane
+  const groundGeo = new THREE.PlaneGeometry(size, size);
+  const groundMat = new THREE.MeshStandardMaterial({
+    color: 0x080818,
+    metalness: 0.8,
+    roughness: 0.4,
+  });
+  const ground = new THREE.Mesh(groundGeo, groundMat);
+  ground.rotation.x = -Math.PI / 2;
+  ground.receiveShadow = true;
+  scene.add(ground);
+
+  // Grid lines
+  const gridHelper = new THREE.GridHelper(size, size / 2, 0x0a2a2a, 0x0a1a2a);
+  gridHelper.position.y = 0.01;
+  scene.add(gridHelper);
+
+  // Glowing center lines
+  const lineMat = new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.15 });
+  for (let i = -size / 2; i <= size / 2; i += 4) {
+    const points = [new THREE.Vector3(i, 0.02, -size / 2), new THREE.Vector3(i, 0.02, size / 2)];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    scene.add(new THREE.Line(geo, lineMat));
+  }
+  for (let i = -size / 2; i <= size / 2; i += 4) {
+    const points = [new THREE.Vector3(-size / 2, 0.02, i), new THREE.Vector3(size / 2, 0.02, i)];
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    scene.add(new THREE.Line(geo, lineMat));
+  }
+}
+
+// ─── Vehicle ─────────────────────────────────────────────────
+let vehicleGroup;
+
+function createVehicle() {
+  vehicleGroup = new THREE.Group();
+
+  // Body — low-poly futuristic shape
+  const bodyGeo = new THREE.BoxGeometry(1.6, 0.5, 3);
+  const bodyMat = new THREE.MeshStandardMaterial({
+    color: 0x111133,
+    metalness: 0.9,
+    roughness: 0.2,
+    emissive: 0x000011,
+  });
+  const body = new THREE.Mesh(bodyGeo, bodyMat);
+  body.position.y = 0.5;
+  body.castShadow = true;
+  vehicleGroup.add(body);
+
+  // Canopy
+  const canopyGeo = new THREE.BoxGeometry(1.2, 0.4, 1.5);
+  const canopyMat = new THREE.MeshStandardMaterial({
+    color: 0x00ffff,
+    metalness: 1,
+    roughness: 0.1,
+    emissive: 0x004444,
+    transparent: true,
+    opacity: 0.6,
+  });
+  const canopy = new THREE.Mesh(canopyGeo, canopyMat);
+  canopy.position.y = 0.95;
+  canopy.position.z = -0.2;
+  vehicleGroup.add(canopy);
+
+  // Front lights
+  const lightGeo = new THREE.BoxGeometry(0.3, 0.15, 0.1);
+  const lightMat = new THREE.MeshBasicMaterial({ color: 0x00ffff });
+  [-0.55, 0.55].forEach(x => {
+    const light = new THREE.Mesh(lightGeo, lightMat);
+    light.position.set(x, 0.45, -1.55);
+    vehicleGroup.add(light);
+  });
+
+  // Rear lights
+  const rearMat = new THREE.MeshBasicMaterial({ color: 0xff0066 });
+  [-0.55, 0.55].forEach(x => {
+    const light = new THREE.Mesh(lightGeo, rearMat);
+    light.position.set(x, 0.45, 1.55);
+    vehicleGroup.add(light);
+  });
+
+  // Undercarriage glow
+  const underGlow = new THREE.PointLight(0x00ffff, 1, 8);
+  underGlow.position.set(0, 0.1, 0);
+  vehicleGroup.add(underGlow);
+
+  // Headlight (spotlight)
+  const headlight = new THREE.SpotLight(0x00ffff, 2, 30, Math.PI / 6, 0.5, 1);
+  headlight.position.set(0, 0.8, -1.5);
+  headlight.target.position.set(0, 0, -20);
+  vehicleGroup.add(headlight);
+  vehicleGroup.add(headlight.target);
+
+  vehicleGroup.position.y = 0.2;
+  scene.add(vehicleGroup);
+}
+
+// ─── Stations ────────────────────────────────────────────────
+const stationObjects = [];
+
+function createStations() {
+  STATIONS.forEach((data, i) => {
+    const group = new THREE.Group();
+    group.position.set(data.position.x, 0, data.position.z);
+
+    // Floating geometry
+    let geo;
+    switch (data.shape) {
+      case 'torus':
+        geo = new THREE.TorusGeometry(2.5, 0.7, 16, 32);
+        break;
+      case 'octahedron':
+        geo = new THREE.OctahedronGeometry(3, 0);
+        break;
+      case 'icosahedron':
+        geo = new THREE.IcosahedronGeometry(2.8, 0);
+        break;
+      case 'torusKnot':
+        geo = new THREE.TorusKnotGeometry(2, 0.6, 64, 8);
+        break;
+      default:
+        geo = new THREE.SphereGeometry(2.5, 8, 8);
+    }
+
+    const mat = new THREE.MeshStandardMaterial({
+      color: data.color,
+      emissive: data.color,
+      emissiveIntensity: 0.3,
+      metalness: 0.7,
+      roughness: 0.3,
+      wireframe: true,
+    });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.position.y = 5;
+    group.add(mesh);
+
+    // Solid inner shape (slightly smaller)
+    const innerMat = new THREE.MeshStandardMaterial({
+      color: data.color,
+      emissive: data.color,
+      emissiveIntensity: 0.15,
+      metalness: 0.9,
+      roughness: 0.2,
+      transparent: true,
+      opacity: 0.3,
+    });
+    let innerGeo;
+    switch (data.shape) {
+      case 'torus':
+        innerGeo = new THREE.TorusGeometry(2, 0.5, 16, 32);
+        break;
+      case 'octahedron':
+        innerGeo = new THREE.OctahedronGeometry(2.2, 0);
+        break;
+      case 'icosahedron':
+        innerGeo = new THREE.IcosahedronGeometry(2, 0);
+        break;
+      case 'torusKnot':
+        innerGeo = new THREE.TorusKnotGeometry(1.5, 0.4, 64, 8);
+        break;
+    }
+    const innerMesh = new THREE.Mesh(innerGeo, innerMat);
+    innerMesh.position.y = 5;
+    group.add(innerMesh);
+
+    // Point light at station
+    const stationLight = new THREE.PointLight(data.color, 2, 20);
+    stationLight.position.y = 5;
+    group.add(stationLight);
+
+    // Ground ring
+    const ringGeo = new THREE.RingGeometry(4, 4.3, 64);
+    const ringMat = new THREE.MeshBasicMaterial({
+      color: data.color,
+      transparent: true,
+      opacity: 0.4,
+      side: THREE.DoubleSide,
+    });
+    const ring = new THREE.Mesh(ringGeo, ringMat);
+    ring.rotation.x = -Math.PI / 2;
+    ring.position.y = 0.02;
+    group.add(ring);
+
+    // Vertical beam
+    const beamGeo = new THREE.CylinderGeometry(0.05, 0.05, 15, 8);
+    const beamMat = new THREE.MeshBasicMaterial({
+      color: data.color,
+      transparent: true,
+      opacity: 0.15,
+    });
+    const beam = new THREE.Mesh(beamGeo, beamMat);
+    beam.position.y = 7.5;
+    group.add(beam);
+
+    // Label text (using a plane with canvas texture)
+    const canvas = document.createElement('canvas');
+    canvas.width = 512; canvas.height = 128;
+    const ctx = canvas.getContext('2d');
+    ctx.fillStyle = 'transparent';
+    ctx.fillRect(0, 0, 512, 128);
+    ctx.font = 'bold 48px Orbitron, monospace';
+    ctx.fillStyle = '#ffffff';
+    ctx.textAlign = 'center';
+    ctx.fillText(data.tag.replace('// ', ''), 256, 72);
+    const labelTex = new THREE.CanvasTexture(canvas);
+    const labelGeo = new THREE.PlaneGeometry(6, 1.5);
+    const labelMat = new THREE.MeshBasicMaterial({
+      map: labelTex,
+      transparent: true,
+      side: THREE.DoubleSide,
+      depthWrite: false,
+    });
+    const label = new THREE.Mesh(labelGeo, labelMat);
+    label.position.y = 10;
+    group.add(label);
+
+    scene.add(group);
+    stationObjects.push({ group, mesh, innerMesh, data, ring, label });
+  });
+}
+
+// ─── Decorative Buildings ─────────────────────────────────────
+function createBuildings() {
+  const buildingCount = 60;
+  const buildingMat = new THREE.MeshStandardMaterial({
+    color: 0x0a0a20,
+    metalness: 0.8,
+    roughness: 0.3,
+  });
+
+  for (let i = 0; i < buildingCount; i++) {
+    const w = 1 + Math.random() * 3;
+    const h = 2 + Math.random() * 12;
+    const d = 1 + Math.random() * 3;
+    const geo = new THREE.BoxGeometry(w, h, d);
+    const mesh = new THREE.Mesh(geo, buildingMat);
+
+    let x, z;
+    do {
+      x = (Math.random() - 0.5) * CONFIG.world.gridSize * 0.8;
+      z = (Math.random() - 0.5) * CONFIG.world.gridSize * 0.8;
+    } while (STATIONS.some(s => Math.hypot(s.position.x - x, s.position.z - z) < 15));
+
+    mesh.position.set(x, h / 2, z);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+
+    // Edge glow
+    const edges = new THREE.EdgesGeometry(geo);
+    const edgeMat = new THREE.LineBasicMaterial({
+      color: [0x00ffff, 0xff00ff, 0x0088ff, 0x00ff88][Math.floor(Math.random() * 4)],
+      transparent: true,
+      opacity: 0.15 + Math.random() * 0.15,
+    });
+    const wireframe = new THREE.LineSegments(edges, edgeMat);
+    mesh.add(wireframe);
+
+    scene.add(mesh);
+  }
+}
+
+// ─── Particles (Stars) ──────────────────────────────────────
+function createParticles() {
+  const count = 3000;
+  const positions = new Float32Array(count * 3);
+  const colors = new Float32Array(count * 3);
+
+  for (let i = 0; i < count; i++) {
+    positions[i * 3] = (Math.random() - 0.5) * 300;
+    positions[i * 3 + 1] = 10 + Math.random() * 80;
+    positions[i * 3 + 2] = (Math.random() - 0.5) * 300;
+
+    const c = new THREE.Color().setHSL(0.5 + Math.random() * 0.2, 0.8, 0.6);
+    colors[i * 3] = c.r;
+    colors[i * 3 + 1] = c.g;
+    colors[i * 3 + 2] = c.b;
+  }
+
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+  geo.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+
+  const mat = new THREE.PointsMaterial({
+    size: 0.3,
+    vertexColors: true,
+    transparent: true,
+    opacity: 0.8,
+    sizeAttenuation: true,
+  });
+
+  scene.add(new THREE.Points(geo, mat));
+}
+
+// ─── Engine Trail Particles ──────────────────────────────────
+const trailParticles = [];
+const trailMax = 100;
+const trailGeo = new THREE.SphereGeometry(0.08, 4, 4);
+const trailMat = new THREE.MeshBasicMaterial({ color: 0x00ffff, transparent: true });
+
+function emitTrail() {
+  if (Math.abs(velocity) < 0.05) return;
+  const p = new THREE.Mesh(trailGeo, trailMat.clone());
+  const pos = vehicleGroup.position.clone();
+  const back = new THREE.Vector3(0, 0.4, 1.8).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicleAngle);
+  p.position.copy(pos.add(back));
+  p.position.x += (Math.random() - 0.5) * 0.3;
+  p.position.z += (Math.random() - 0.5) * 0.3;
+  p.userData.life = 1.0;
+  p.userData.vy = 0.02 + Math.random() * 0.03;
+  scene.add(p);
+  trailParticles.push(p);
+  if (trailParticles.length > trailMax) {
+    const old = trailParticles.shift();
+    scene.remove(old);
+    old.geometry.dispose();
+    old.material.dispose();
+  }
+}
+
+function updateTrail(dt) {
+  for (let i = trailParticles.length - 1; i >= 0; i--) {
+    const p = trailParticles[i];
+    p.userData.life -= dt * 1.5;
+    p.position.y += p.userData.vy;
+    p.material.opacity = Math.max(0, p.userData.life);
+    p.scale.setScalar(p.userData.life);
+    if (p.userData.life <= 0) {
+      scene.remove(p);
+      p.geometry.dispose();
+      p.material.dispose();
+      trailParticles.splice(i, 1);
+    }
+  }
+}
+
+// ─── Minimap ─────────────────────────────────────────────────
+const minimapCanvas = document.getElementById('minimap-canvas');
+const mctx = minimapCanvas.getContext('2d');
+
+function drawMinimap() {
+  const w = minimapCanvas.width, h = minimapCanvas.height;
+  mctx.clearRect(0, 0, w, h);
+
+  const scale = w / CONFIG.world.gridSize;
+  const cx = w / 2, cy = h / 2;
+
+  // Grid dots
+  mctx.fillStyle = 'rgba(0,255,255,0.06)';
+  for (let x = -50; x <= 50; x += 10) {
+    for (let z = -50; z <= 50; z += 10) {
+      mctx.fillRect(cx + x * scale - 0.5, cy + z * scale - 0.5, 1, 1);
+    }
+  }
+
+  // Stations
+  STATIONS.forEach((s, i) => {
+    const sx = cx + s.position.x * scale;
+    const sy = cy + s.position.z * scale;
+    const c = '#' + s.color.toString(16).padStart(6, '0');
+    mctx.fillStyle = c;
+    mctx.shadowColor = c;
+    mctx.shadowBlur = 6;
+    mctx.beginPath();
+    mctx.arc(sx, sy, 4, 0, Math.PI * 2);
+    mctx.fill();
+    mctx.shadowBlur = 0;
+  });
+
+  // Vehicle
+  if (vehicleGroup) {
+    const vx = cx + vehicleGroup.position.x * scale;
+    const vy = cy + vehicleGroup.position.z * scale;
+    mctx.fillStyle = '#fff';
+    mctx.shadowColor = '#0ff';
+    mctx.shadowBlur = 8;
+    mctx.beginPath();
+    mctx.arc(vx, vy, 3, 0, Math.PI * 2);
+    mctx.fill();
+    mctx.shadowBlur = 0;
+
+    // Direction indicator
+    const dx = Math.sin(vehicleAngle) * 8;
+    const dy = -Math.cos(vehicleAngle) * 8;
+    mctx.strokeStyle = 'rgba(0,255,255,0.5)';
+    mctx.lineWidth = 1;
+    mctx.beginPath();
+    mctx.moveTo(vx, vy);
+    mctx.lineTo(vx + dx, vy - dy);
+    mctx.stroke();
+  }
+}
+
+// ─── Input ───────────────────────────────────────────────────
+document.addEventListener('keydown', (e) => {
+  const key = e.key.toLowerCase();
+  if (key === 'w' || key === 'arrowup') keys.w = true;
+  if (key === 'a' || key === 'arrowleft') keys.a = true;
+  if (key === 's' || key === 'arrowdown') keys.s = true;
+  if (key === 'd' || key === 'arrowright') keys.d = true;
+  if (key === 'e') keys.e = true;
+
+  if (!hasMovedOnce && (keys.w || keys.a || keys.s || keys.d)) {
+    hasMovedOnce = true;
+    document.getElementById('controls-hint').classList.add('faded');
+  }
+});
+
+document.addEventListener('keyup', (e) => {
+  const key = e.key.toLowerCase();
+  if (key === 'w' || key === 'arrowup') keys.w = false;
+  if (key === 'a' || key === 'arrowleft') keys.a = false;
+  if (key === 's' || key === 'arrowdown') keys.s = false;
+  if (key === 'd' || key === 'arrowright') keys.d = false;
+  if (key === 'e') keys.e = false;
+  if (key === 'escape' && panelOpen) closePanel();
+});
+
+// Key visuals
+function updateKeyVisuals() {
+  document.getElementById('k-w').classList.toggle('active', keys.w);
+  document.getElementById('k-a').classList.toggle('active', keys.a);
+  document.getElementById('k-s').classList.toggle('active', keys.s);
+  document.getElementById('k-d').classList.toggle('active', keys.d);
+}
+
+// Cursor
+document.addEventListener('mousemove', (e) => {
+  const cursor = document.getElementById('cursor');
+  cursor.style.left = e.clientX + 'px';
+  cursor.style.top = e.clientY + 'px';
+});
+
+// Panel
+document.getElementById('panel-close').addEventListener('click', closePanel);
+
+function showPanel(station) {
+  panelOpen = true;
+  document.getElementById('panel-tag').textContent = station.tag;
+  document.getElementById('panel-title').innerHTML = station.title;
+  document.getElementById('panel-body').innerHTML = station.body;
+  const tagsContainer = document.getElementById('panel-tags');
+  tagsContainer.innerHTML = station.tags.map(t => `<span class="p-tag">${t}</span>`).join('');
+  document.getElementById('info-panel').classList.add('visible');
+}
+
+function closePanel() {
+  panelOpen = false;
+  document.getElementById('info-panel').classList.remove('visible');
+}
+
+// ─── Touch Controls (Mobile) ─────────────────────────────────
+let touchActive = false;
+let touchStartX = 0, touchStartY = 0;
+let touchDX = 0, touchDY = 0;
+
+document.addEventListener('touchstart', (e) => {
+  touchActive = true;
+  touchStartX = e.touches[0].clientX;
+  touchStartY = e.touches[0].clientY;
+  if (!hasMovedOnce) {
+    hasMovedOnce = true;
+  }
+}, { passive: true });
+
+document.addEventListener('touchmove', (e) => {
+  if (!touchActive) return;
+  touchDX = (e.touches[0].clientX - touchStartX) / 60;
+  touchDY = (e.touches[0].clientY - touchStartY) / 60;
+}, { passive: true });
+
+document.addEventListener('touchend', () => {
+  touchActive = false;
+  touchDX = 0;
+  touchDY = 0;
+});
+
+// Double tap to interact
+let lastTap = 0;
+document.addEventListener('touchend', (e) => {
+  const now = Date.now();
+  if (now - lastTap < 300 && nearStation && !panelOpen) {
+    showPanel(nearStation.data);
+  }
+  lastTap = now;
+});
+
+// ─── Physics / Update ────────────────────────────────────────
+function updateVehicle(dt) {
+  if (panelOpen) return;
+
+  const cfg = CONFIG.vehicle;
+  let accelInput = 0;
+  let turnInput = 0;
+
+  if (keys.w) accelInput += 1;
+  if (keys.s) accelInput -= 1;
+  if (keys.a) turnInput += 1;
+  if (keys.d) turnInput -= 1;
+
+  // Mobile touch
+  if (touchActive) {
+    accelInput = -touchDY;
+    turnInput = -touchDX;
+    accelInput = Math.max(-1, Math.min(1, accelInput));
+    turnInput = Math.max(-1, Math.min(1, turnInput));
+  }
+
+  // Acceleration
+  if (accelInput > 0) {
+    velocity += cfg.acceleration * accelInput * dt * 60;
+  } else if (accelInput < 0) {
+    velocity += cfg.braking * accelInput * dt * 60;
+  }
+  velocity *= cfg.friction;
+  velocity = Math.max(-cfg.maxSpeed * 0.5, Math.min(cfg.maxSpeed, velocity));
+
+  // Steering (stronger at speed)
+  const speedFactor = Math.min(1, Math.abs(velocity) / 0.5);
+  angularVelocity += turnInput * cfg.turnSpeed * speedFactor * Math.sign(velocity || 1) * dt * 60;
+  angularVelocity *= cfg.turnFriction;
+  vehicleAngle += angularVelocity;
+
+  // Position
+  const dx = Math.sin(vehicleAngle) * velocity;
+  const dz = -Math.cos(vehicleAngle) * velocity;
+  vehicleGroup.position.x += dx;
+  vehicleGroup.position.z += dz;
+
+  // Boundary clamp
+  const bound = CONFIG.world.gridSize / 2 - 5;
+  vehicleGroup.position.x = Math.max(-bound, Math.min(bound, vehicleGroup.position.x));
+  vehicleGroup.position.z = Math.max(-bound, Math.min(bound, vehicleGroup.position.z));
+
+  // Rotation
+  vehicleGroup.rotation.y = vehicleAngle;
+
+  // Tilt on turn
+  vehicleGroup.rotation.z = -angularVelocity * 3;
+
+  // Hover bob
+  vehicleGroup.position.y = 0.2 + Math.sin(Date.now() * 0.003) * 0.05;
+
+  // Speed display
+  const displaySpeed = Math.abs(velocity * 100).toFixed(0);
+  document.getElementById('speed-val').textContent = displaySpeed;
+}
+
+function updateCamera() {
+  if (!vehicleGroup) return;
+  const cfg = CONFIG.camera;
+  const target = vehicleGroup.position.clone();
+
+  const idealOffset = new THREE.Vector3(0, cfg.height, cfg.distance);
+  idealOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicleAngle);
+  idealOffset.add(vehicleGroup.position);
+
+  camera.position.lerp(idealOffset, cfg.smoothing);
+
+  const lookTarget = target.clone();
+  lookTarget.y += 1.5;
+  const ahead = new THREE.Vector3(0, 0, -cfg.lookAhead).applyAxisAngle(new THREE.Vector3(0, 1, 0), vehicleAngle);
+  lookTarget.add(ahead);
+  camera.lookAt(lookTarget);
+}
+
+function checkProximity() {
+  if (!vehicleGroup) return;
+  const vPos = vehicleGroup.position;
+  let closest = null;
+  let closestDist = Infinity;
+
+  stationObjects.forEach(s => {
+    const dist = vPos.distanceTo(s.group.position);
+    if (dist < CONFIG.world.stationProximity && dist < closestDist) {
+      closest = s;
+      closestDist = dist;
+    }
+  });
+
+  const proxEl = document.getElementById('proximity');
+  if (closest && !panelOpen) {
+    nearStation = closest;
+    proxEl.classList.add('visible');
+    proxEl.innerHTML = `[ ${closest.data.tag} ] — 按 <strong>E</strong> 键查看`;
+  } else if (!panelOpen) {
+    nearStation = null;
+    proxEl.classList.remove('visible');
+  }
+
+  // E key interaction
+  if (keys.e && nearStation && !panelOpen) {
+    showPanel(nearStation.data);
+    keys.e = false;
+  }
+}
+
+// ─── Animate Stations ────────────────────────────────────────
+function animateStations(time) {
+  stationObjects.forEach((s, i) => {
+    const t = time * 0.001 + i * 1.5;
+    s.mesh.rotation.x = t * 0.5;
+    s.mesh.rotation.y = t * 0.3;
+    s.mesh.position.y = 5 + Math.sin(t * 0.8) * 0.5;
+
+    s.innerMesh.rotation.x = -t * 0.3;
+    s.innerMesh.rotation.y = -t * 0.5;
+    s.innerMesh.position.y = s.mesh.position.y;
+
+    // Ring pulse
+    const pulse = 0.4 + Math.sin(t * 2) * 0.15;
+    s.ring.material.opacity = pulse;
+
+    // Label always face camera
+    s.label.lookAt(camera.position);
+  });
+}
+
+// ─── Loading ─────────────────────────────────────────────────
+function initWorld() {
+  createGround();
+  loadProgress = 30;
+
+  createVehicle();
+  loadProgress = 50;
+
+  createStations();
+  loadProgress = 70;
+
+  createBuildings();
+  loadProgress = 85;
+
+  createParticles();
+  loadProgress = 100;
+}
+
+function simulateLoading() {
+  const bar = document.getElementById('load-bar');
+  let displayed = 0;
+  const interval = setInterval(() => {
+    displayed += (loadProgress - displayed) * 0.15 + 0.5;
+    if (displayed > loadProgress) displayed = loadProgress;
+    bar.style.width = displayed + '%';
+    if (displayed >= 99) {
+      clearInterval(interval);
+      bar.style.width = '100%';
+      setTimeout(() => {
+        document.getElementById('loading').classList.add('hidden');
+      }, 500);
+    }
+  }, 40);
+}
+
+// ─── Main Loop ───────────────────────────────────────────────
+const clock = new THREE.Clock();
+
+function animate() {
+  requestAnimationFrame(animate);
+  const dt = Math.min(clock.getDelta(), 0.05);
+  const time = clock.getElapsedTime() * 1000;
+
+  updateVehicle(dt);
+  updateCamera();
+  checkProximity();
+  animateStations(time);
+  updateKeyVisuals();
+
+  // Trail
+  if (Math.random() < Math.abs(velocity) * 2) emitTrail();
+  updateTrail(dt);
+
+  // Minimap
+  drawMinimap();
+
+  renderer.render(scene, camera);
+}
+
+// ─── Resize ──────────────────────────────────────────────────
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// ─── Init ────────────────────────────────────────────────────
+initWorld();
+simulateLoading();
+animate();
+</script>
+</body>
+</html>
