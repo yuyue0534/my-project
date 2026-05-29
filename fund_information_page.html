@@ -1130,222 +1130,167 @@ class MultiSelect {
     }
 
     function drawChart0() {
-      if (!chartInstance) {
-        chartInstance = echarts.init(document.getElementById('chart0'));
-      }
-
-      const { count, labels } = getChartDataPoints(currentPeriod);
-
-      // 生成 Total Net Count（平稳递增，每期固定小幅增加）
-      let baseContrib = 48000 + Math.random() * 4000;
-      const contribStep = 80 + Math.random() * 40;
-      const contribData = [];
-      for (let i = 0; i < count; i++) {
-        baseContrib += contribStep;
-        contribData.push(+baseContrib.toFixed(2));
-      }
-
-      // 生成 Assets（明显波动，有涨有跌，总体趋势向上）
-      const assetsData = [];
-      let rawFunddata = 88000 + Math.random() * 4000;
-      const volatility = (contribData[0] * 0.008);
-      for (let i = 0; i < count; i++) {
-        // 随机涨跌，70%概率上涨，30%概率下跌
-        const direction = Math.random() < 0.7 ? 1 : -1;
-        const change = direction * (Math.random() * volatility);
-        // 叠加微弱长期趋势
-        rawFunddata += change + contribStep * 0.3;
-        assetsData.push(+rawFunddata.toFixed(2));
-      }
-
-      // 差额 Gain-Loss = Assets - Total Net Count
-      const gainLossData = assetsData.map((v, i) => +(v - contribData[i]).toFixed(2));
-
-      chartInstance.setOption({
-        tooltip: { trigger: 'axis' },
-        legend: { top: 36, left: 'center', textStyle: { fontSize: 10 } },
-        grid: { left: 70, right: 40, top: 80, bottom: 40 },
-        xAxis: { type: 'category', data: labels,
-          axisLabel: {
-            formatter: value => {
-              const lastSpaceIndex = value.lastIndexOf(',');
-              return value.substring(0, lastSpaceIndex) + '\n' + value.substring(lastSpaceIndex + 1);
-            }
-          },
-        },
-        yAxis: {
-          type: 'value',
-          splitNumber: 6,
-          min: value => {
-            const range = value.max - value.min;
-            const result = value.min - range * 0.3;
-            const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
-            return Math.floor(result / magnitude) * magnitude;
-          },
-          max: value => {
-            const range = value.max - value.min;
-            const result = value.max + range * 0.3;
-            const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
-            return Math.ceil(result / magnitude) * magnitude;
-          },
-          axisLine: { show: true, lineStyle: { color: '#fac858' } },
-        },
-        series: [
-          {
-            name: 'Assets',
-            type: 'line',
-            data: assetsData,
-            showSymbol: false,
-            smooth: true,
-            color: '#fac858',
-          },
-          {
-            name: 'Total Net Count',
-            type: 'line',
-            data: contribData,
-            showSymbol: false,
-            smooth: true,
-            color: '#5470c6',
-            lineStyle: { type: 'dashed' },
-          },
-          {
-            name: 'Gain-Loss',
-            type: 'line',
-            data: gainLossData,
-            showSymbol: false,
-            smooth: true,
-            color: '#91cc75',
-            lineStyle: { type: 'dotted' },
-          },
-        ],
-      }, true);
-    }
-
-    function drawChart() {
-      const { count, labels } = getChartDataPoints(currentPeriod);
-      const selectedList = [...selected];
-      const container = document.getElementById('chart');
-      // 颜色列表
-      const colors = ['#5470c6', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'];
-
-      // 1. 销毁已不在 selected 中的实例，移除对应 dom
-      Object.keys(chartInstances).forEach(id => {
-        if (!selected.has(id)) {
-          chartInstances[id].dispose();
-          delete chartInstances[id];
-          const el = document.getElementById('chart-panel-' + id);
-          if (el) el.remove();
+        if (!chartInstance) {
+            chartInstance = echarts.init(document.getElementById('chart0'));
         }
-      });
+        const { count, labels } = getChartDataPoints(currentPeriod);
 
-      // 2. 按 selectedList 顺序，确保 dom 顺序与选择顺序一致
-      selectedList.forEach(id => {
-        let el = document.getElementById('chart-panel-' + id);
-        if (!el) {
-          el = document.createElement('div');
-          el.id = 'chart-panel-' + id;
-          el.style.cssText = 'width:100%;height:210px;margin-bottom:10px;';
-        }
-        container.appendChild(el);   // 已存在的节点 append 会自动移到末尾保持顺序
-
-        if (!chartInstances[id]) {
-          chartInstances[id] = echarts.init(el);
-        }
-
-        const f = schemaList.find(x => x.id === id);
-
-        // 生成 Total Net Count（平稳递增，每期固定小幅增加）
-        let baseContrib = 48000 + Math.random() * 4000;
-        const contribStep = 80 + Math.random() * 40;
+        // 总供款额：50000 左右，平稳小幅递增
+        let contrib = 48000 + Math.random() * 4000;
         const contribData = [];
         for (let i = 0; i < count; i++) {
-          baseContrib += contribStep;
-          contribData.push(+baseContrib.toFixed(2));
-        }
-        // 生成 Assets（明显波动，有涨有跌，总体趋势向上）
-        const assetsData = [];
-        let rawFunddata = 88000 + Math.random() * 4000;
-        const volatility = (contribData[0] * 0.008);
-        for (let i = 0; i < count; i++) {
-          const direction = Math.random() < 0.7 ? 1 : -1;
-          const change = direction * (Math.random() * volatility);
-          rawFunddata += change + contribStep * 0.3;
-          assetsData.push(+rawFunddata.toFixed(2));
+            contrib += 40 + Math.random() * 20;
+            contribData.push(+contrib.toFixed(2));
         }
 
-        // 差额 Gain-Loss = Assets - Total Net Count
+        // 资产值：90000 左右，有明显波动，总体平稳
+        let assets = 88000 + Math.random() * 4000;
+        const assetsData = [];
+        for (let i = 0; i < count; i++) {
+            const direction = Math.random() < 0.6 ? 1 : -1;
+            assets += direction * (Math.random() * 600) + 20;
+            assets = Math.max(85000, Math.min(95000, assets));
+            assetsData.push(+assets.toFixed(2));
+        }
+
+        // 差额 = 资产值 - 总供款额
         const gainLossData = assetsData.map((v, i) => +(v - contribData[i]).toFixed(2));
 
-
-        chartInstances[id].setOption({
-          tooltip: { trigger: 'axis' },
-          title: {
-            text: f?.name ?? '',
-            left: 70,
-            top: 4,
-            textStyle: { fontSize: 11, fontWeight: 'normal', color: colors[id % colors.length] },
-          },
-          legend: { top: 18, left: 70, right: 10, textStyle: { fontSize: 9 }, itemWidth: 12, itemHeight: 8 },
-          grid: { left: 70, right: 40, top: 52, bottom: 30 },
-          xAxis: { type: 'category', data: labels,
+        chartInstance.setOption({
+            tooltip: { trigger: 'axis' },
+            legend: { top: 36, left: 'center', textStyle: { fontSize: 10 } },
+            grid: { left: 70, right: 40, top: 80, bottom: 40 },
+            xAxis: { type: 'category', data: labels,
             axisLabel: {
-              formatter: value => {
+                formatter: value => {
                 const lastSpaceIndex = value.lastIndexOf(',');
                 return value.substring(0, lastSpaceIndex) + '\n' + value.substring(lastSpaceIndex + 1);
-              }
+                }
             },
-          },
-          yAxis: {
+            },
+            yAxis: {
             type: 'value',
-            splitNumber: 4,
+            splitNumber: 6,
             min: value => {
-              const range = value.max - value.min;
-              const result = value.min - range * 0.3;
-              const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
-              return Math.floor(result / magnitude) * magnitude;
+                const range = value.max - value.min;
+                const result = value.min - range * 0.3;
+                const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+                return Math.floor(result / magnitude) * magnitude;
             },
             max: value => {
-              const range = value.max - value.min;
-              const result = value.max + range * 0.3;
-              const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
-              return Math.ceil(result / magnitude) * magnitude;
+                const range = value.max - value.min;
+                const result = value.max + range * 0.3;
+                const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+                return Math.ceil(result / magnitude) * magnitude;
             },
-            axisLine: { show: true, lineStyle: { color: colors[id % colors.length] } },
-            
-          },
-          series: [
-            {
-              name: 'Assets',
-              type: 'line',
-              data: assetsData,
-              showSymbol: false,
-              smooth: true,
-              color: colors[id % colors.length],
+            axisLine: { show: true, lineStyle: { color: '#fac858' } },
             },
-            {
-              name: 'Total Net Count',
-              type: 'line',
-              data: contribData,
-              showSymbol: false,
-              smooth: true,
-              color: '#5470c6',
-              lineStyle: { type: 'dashed' },
-            },
-            {
-              name: 'Gain-Loss',
-              type: 'line',
-              data: gainLossData,
-              showSymbol: false,
-              smooth: true,
-              color: '#91cc75',
-              lineStyle: { type: 'dotted' },
-            },
-          ],
+            series: [
+            { name: 'Assets',          type: 'line', data: assetsData,   showSymbol: false, smooth: true, color: '#fac858' },
+            { name: 'Total Net Count', type: 'line', data: contribData,  showSymbol: false, smooth: true, color: '#5470c6', lineStyle: { type: 'dashed' } },
+            { name: 'Gain-Loss',       type: 'line', data: gainLossData, showSymbol: false, smooth: true, color: '#91cc75', lineStyle: { type: 'dotted' } },
+            ],
         }, true);
-        console.warn('everydata: ', id, 'name: ', f.name, 'assets:', assetsData, 'contrib:', contribData, 'gainLoss:', gainLossData)
-      });
     }
 
+
+    function drawChart() {
+        const { count, labels } = getChartDataPoints(currentPeriod);
+        const selectedList = [...selected];
+        const container = document.getElementById('chart');
+        const colors = ['#5470c6', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'];
+
+        // 1. 销毁已不在 selected 中的实例，移除对应 dom
+        Object.keys(chartInstances).forEach(id => {
+            if (!selected.has(id)) {
+            chartInstances[id].dispose();
+            delete chartInstances[id];
+            const el = document.getElementById('chart-panel-' + id);
+            if (el) el.remove();
+            }
+        });
+
+        // 2. 按 selectedList 顺序，确保 dom 顺序与选择顺序一致
+        selectedList.forEach(id => {
+            let el = document.getElementById('chart-panel-' + id);
+            if (!el) {
+            el = document.createElement('div');
+            el.id = 'chart-panel-' + id;
+            el.style.cssText = 'width:100%;height:210px;margin-bottom:10px;';
+            }
+            container.appendChild(el);
+
+            if (!chartInstances[id]) {
+            chartInstances[id] = echarts.init(el);
+            }
+
+            const f = schemaList.find(x => x.id === id);
+
+            // 总供款额：50000 左右，平稳小幅递增
+            let contrib = 48000 + Math.random() * 4000;
+            const contribData = [];
+            for (let i = 0; i < count; i++) {
+            contrib += 40 + Math.random() * 20;
+            contribData.push(+contrib.toFixed(2));
+            }
+
+            // 资产值：90000 左右，有明显波动，总体平稳
+            let assets = 88000 + Math.random() * 4000;
+            const assetsData = [];
+            for (let i = 0; i < count; i++) {
+            const direction = Math.random() < 0.6 ? 1 : -1;
+            assets += direction * (Math.random() * 600) + 20;
+            assets = Math.max(85000, Math.min(95000, assets));
+            assetsData.push(+assets.toFixed(2));
+            }
+
+            // 差额 = 资产值 - 总供款额
+            const gainLossData = assetsData.map((v, i) => +(v - contribData[i]).toFixed(2));
+
+            chartInstances[id].setOption({
+            tooltip: { trigger: 'axis' },
+            title: {
+                text: f?.name ?? '',
+                left: 70,
+                top: 4,
+                textStyle: { fontSize: 11, fontWeight: 'normal', color: colors[id % colors.length] },
+            },
+            legend: { top: 18, left: 70, right: 10, textStyle: { fontSize: 9 }, itemWidth: 12, itemHeight: 8 },
+            grid: { left: 70, right: 40, top: 52, bottom: 30 },
+            xAxis: { type: 'category', data: labels,
+                axisLabel: {
+                formatter: value => {
+                    const lastSpaceIndex = value.lastIndexOf(',');
+                    return value.substring(0, lastSpaceIndex) + '\n' + value.substring(lastSpaceIndex + 1);
+                }
+                },
+            },
+            yAxis: {
+                type: 'value',
+                splitNumber: 4,
+                min: value => {
+                const range = value.max - value.min;
+                const result = value.min - range * 0.3;
+                const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+                return Math.floor(result / magnitude) * magnitude;
+                },
+                max: value => {
+                const range = value.max - value.min;
+                const result = value.max + range * 0.3;
+                const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+                return Math.ceil(result / magnitude) * magnitude;
+                },
+                axisLine: { show: true, lineStyle: { color: colors[id % colors.length] } },
+            },
+            series: [
+                { name: 'Assets',          type: 'line', data: assetsData,   showSymbol: false, smooth: true, color: colors[id % colors.length] },
+                { name: 'Total Net Count', type: 'line', data: contribData,  showSymbol: false, smooth: true, color: '#5470c6', lineStyle: { type: 'dashed' } },
+                { name: 'Gain-Loss',       type: 'line', data: gainLossData, showSymbol: false, smooth: true, color: '#91cc75', lineStyle: { type: 'dotted' } },
+            ],
+            }, true);
+            console.warn('everydata: ', id, 'name: ', f.name, 'assets:', assetsData[0], 'contrib:', contribData[0], 'gainLoss:', gainLossData[0]);
+        });
+    }
     // renderTable1();
 
     const date = new Date(); // 当前日期
