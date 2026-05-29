@@ -1,0 +1,1362 @@
+<!DOCTYPE html>
+<html lang="en-US">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Fund Information</title>
+
+  <!-- noUiSlider for dual-handle range -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.css" />
+  <script src="https://cdn.jsdelivr.net/npm/nouislider@15.7.1/dist/nouislider.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/echarts@5/dist/echarts.min.js"></script>
+
+  <style>
+    :root{
+      --primary:#FF9400;
+      --btn:#1D3354;
+      --bg:#f6f7f9;
+      --border: #dcdfe6;
+      --radius: 8px;
+    }
+    body{
+      margin:0;font-family:-apple-system,BlinkMacSystemFont,Segoe UI,Roboto;background:var(--bg);
+      overflow: hidden;
+      height: 100vh;
+    }
+
+    /* ── 顶部 Tab 栏 ── */
+    .tab-bar {
+      position: sticky;
+      top: 0;
+      z-index: 100;
+      display: flex;
+      background: #fff;
+      border-bottom: 1px solid #e8e8e8;
+      box-shadow: 0 2px 8px rgba(0,0,0,.06);
+    }
+
+    .tab-item {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 14px 0 0;
+      cursor: pointer;
+      position: relative;
+      user-select: none;
+      -webkit-user-select: none;
+    }
+
+    .tab-label {
+      font-size: 15px;
+      font-weight: 700;
+      color: #999;
+      letter-spacing: .5px;
+      transition: color .22s;
+      padding-bottom: 11px;
+    }
+
+    /* 下划线条 */
+    .tab-underline {
+      position: absolute;
+      bottom: 0;
+      left: 50%;
+      transform: translateX(-50%) scaleX(0);
+      width: 90%;
+      height: 3px;
+      border-radius: 3px 3px 0 0;
+      background: var(--primary);
+      transform-origin: center;
+      transition: transform .25s cubic-bezier(.34,1.56,.64,1), background .22s;
+    }
+
+    /* 激活态 */
+    .tab-item.active .tab-label   { color: var(--primary); }
+    .tab-item.active .tab-underline { transform: translateX(-50%) scaleX(1); }
+
+    /* 点击水波 */
+    .tab-item:active .tab-label { opacity: .65; }
+
+    /* ── 页面内容 ── */
+    .tab-panels { overflow: hidden; }
+
+    .tab-panel {
+      display: none;
+      animation: fadeUp .28s ease both;
+    }
+    .tab-panel.active { display: block; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+
+    /* ── 示例子页面样式（替换成你自己的内容即可）── */
+    .tabpage-wrapper {
+      padding: 2px;
+    }
+
+    header{color:var(--primary);background:#fff;padding:12px;text-align:left;font-weight:600;font-size: 22px;}
+    .container{padding:11px;}
+    #listPage0 {
+      display: flex; flex-direction: column;
+      height: calc(100vh - 110px);
+      overflow: hidden;
+    }
+    .table-scroll-wrap {
+      flex: 1; overflow-y: auto;
+      -webkit-overflow-scrolling: touch;
+    }
+    #listPage1 {
+      display: flex; flex-direction: column;
+      height: calc(100vh - 130px);
+      overflow: auto;
+    }
+    #listPage2 {
+      display: flex; flex-direction: column;
+      height: calc(100vh - 130px);
+      overflow: hidden;
+    }
+    #report_table_pagination {
+      position: sticky;
+      bottom: 50px;
+      z-index: 10;
+    }
+    #fixedBar{position:sticky; bottom:0; border-top:1px solid #ddd;padding-top:10px;display:flex;justify-content:space-between;align-items:center; box-sizing: border-box;}
+    #fixedBar button{background:var(--btn);color:#fff;border:none;padding:8px 16px;border-radius:18px;}
+    .commonbtn_wrapper{display: flex; justify-content: space-around; margin-top: 11px;}
+    #common_button{background:var(--btn);color:#fff;border:none;padding:8px 16px;border-radius:18px; min-width: 100px;}
+    .commonbtn_wrapper .reset_btn{background: var(--primary) !important;}
+
+    .filter{background:#fff;border-radius:10px;padding:8px;margin-bottom:12px;}
+    .filter-group{margin:5px 2px; display: grid; grid-template-columns: 90px 1fr;}
+    .long_label {grid-template-columns:90px 1fr 50px;}
+    .long_label .label_title {line-height: 18px !important;}
+    .long_label .fixedRefreshBtn{background:var(--btn);color:#fff;border:none; border-radius: 18px; width: 32px; height: 48px; font-size: 18px; transform: rotate(90deg); margin-top: -7px; margin-left: 18px;}
+    .filter-group1{margin:8px 4px; display: grid; grid-template-columns: 90px 1fr;}
+    .filter-group .label_title, .filter-group1 .label_title {
+      font-size: 16px;
+      color: #333;
+      line-height: 34px;
+      font-weight: 400;
+    }
+
+    .period_wrapper {
+      display: flex;
+      align-items: center;
+      width: 100%;
+      min-width: 0;
+    }
+
+    /* 输入框均分剩余宽度 */
+    .period_wrapper input {
+      flex: 1;
+      min-width: 0;   /* 防止flex子项溢出 */
+      box-sizing: border-box;
+      /* 可选：统一样式 */
+      padding: 6px 4px;
+      border: 1px solid #ddd;
+      border-radius: 4px;
+    }
+
+    /* 中间分隔符 ~ */
+    .period_wrapper span {
+      flex-shrink: 0;
+      margin: 0 12px;
+      /* 可选样式 */
+      color: #666;
+    }
+
+    .card-double {
+      box-shadow:
+        0 2px 4px rgba(0, 0, 0, 0.05),
+        0 4px 8px rgba(0, 0, 0, 0.07);
+      border-radius: 8px;
+      background: #fff;
+      transition: box-shadow 0.3s ease;
+    }
+
+    .card-double:hover {
+      box-shadow:
+        0 4px 8px rgba(0, 0, 0, 0.08),
+        0 8px 16px rgba(0, 0, 0, 0.1);
+    }
+    .slider{margin:10px 0;}
+    .slider-value{font-size:12px;color:#666;}
+
+    table{width:100%;border-collapse:collapse;background:#fff; overflow:hidden;}
+    th,td{padding:6px;font-size:13px;border-bottom:1px solid #eee;text-align:left;}
+    th{background:var(--primary); color: #fff;font-weight:600;}
+
+    #data1table thead th:nth-child(2) {min-width: 50px;}
+    #data1table thead th:nth-child(3) {min-width: 50px;}
+    #data1table thead th:nth-child(4) {min-width: 50px;}
+    #data1table  tr:nth-child(2n+1) {background: #FFE4C4;}
+    #data1table td {
+      padding: 6px;
+      font-size: 13px;
+      border-bottom: 1px solid #eee;
+      text-align: left;
+    }
+    #reportTableBody > tr:nth-child(2n+1) {background: #FFE4C4;}
+    .report_table >thead th:nth-child(2) { min-width: 80px;}
+    .report_table >thead th:nth-child(3) { min-width: 80px;}
+    .report_table >thead th:nth-child(5) { min-width: 55px;}
+    .report_table >thead th:nth-child(6) { min-width: 45px;}
+    .report_table >thead th:nth-child(7) { min-width: 45px;}
+    .report_table >thead th:nth-child(8) { min-width: 45px;}
+    .mainSchema {border-bottom: 1px solid #eee; padding: 4px;}
+
+    .pagination{
+      display:flex;justify-content:center;gap:10px;margin:10px 0;
+    }
+    .pagination button{border:1px solid var(--btn);padding:6px 12px;border-radius:6px;background:#eee;}
+    .pagination #pageInfo {font-size: 12px; line-height: 26px;}
+    .remark_text {font-size: 14px;}
+
+    #pagination1 {
+      position: sticky;
+      bottom: 0;
+      z-index: 10;
+    }
+
+    #fixedBar1 {display:flex;justify-content:space-between; padding: 5px;}
+
+    .hidden{display:none;}
+
+    .compare-header{display:flex;align-items:center;gap:10px;margin-bottom:10px;}
+    .back{font-size:20px;cursor:pointer;}
+
+    .compare-table th,.compare-table td{text-align:center;}
+
+    .riskText {
+      padding-left: 5px;
+      border-left: 3px solid;
+    }
+    .risk-1 { border-left-color: #8080FF; }
+    .risk-2 { border-left-color: #4A8AC6; }
+    .risk-3 { border-left-color: #238B8B; }
+    .risk-4 { border-left-color: #366E24; }
+    .risk-5 { border-left-color: #E6A200; }
+    .risk-6 { border-left-color: #EC6C3D; }
+    .risk-7 { border-left-color: #E02E20; }
+
+    .section {
+      margin-bottom: 40px;
+    }
+    
+    .compact-slider .noUi-target{height: 6px; border-radius: 3px;}
+    .compact-slider .noUi-connect{background: var(--primary);}
+        /* 改造滑块手柄：圆框 + 内部数值显示 */
+    .compact-slider .noUi-handle {
+      width: 28px;
+      height: 28px;
+      right: -14px;        /* 半宽偏移，使手柄中心对准轨道端点 */
+      top: -11px;          /* (轨道高度6 - 手柄高度28)/2 = -11px */
+      border-radius: 50%;
+      background: #fff;
+      border: 2px solid var(--primary);
+      box-shadow: 0 1px 3px rgba(0,0,0,0.1);
+      cursor: pointer;
+      transition: transform 0.1s ease, box-shadow 0.1s;
+    }
+    .compact-slider .noUi-handle:hover {
+      transform: scale(1.05);
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+    }
+    .compact-slider .noUi-handle:active {
+      transform: scale(0.98);
+    }
+    /* 隐藏默认的伪元素内容 */
+    .compact-slider .noUi-handle::before,
+    .compact-slider .noUi-handle::after {
+      display: none;
+    }
+    /* 手柄内部数值显示容器 */
+    .compact-slider .handle-value {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 12px;
+      font-weight: 600;
+      color: var(--primary);
+      background: transparent;
+      border-radius: 50%;
+      line-height: 1;
+      user-select: none;
+    }
+
+        /* 刻度条样式 */
+    .slider-scale {
+      display: grid;
+      grid-template-columns: repeat(7, 1fr);
+      margin-top: 10px;      /* 与轨道保持紧凑距离 */
+      text-align: center;
+      position: relative;
+      padding: 0;
+      width: 100%;
+      box-sizing: border-box;
+      font-size: 12px;
+      color: #666;
+    }
+
+
+    .slider-scale span {
+      text-align: center;
+      cursor: default;
+      line-height: 1.2;
+    }
+    /* 可选：添加刻度线 */
+    .slider-scale span::before {
+      content: '';
+      display: block;
+      width: 1px;
+      height: 6px;
+      background: #ccc;
+      margin: 0 auto 3px;
+    }
+
+        /* 确保滑块轨道容器宽度与刻度容器完全一致，无额外边距 */
+    .compact-slider {
+      width: 100%;
+      margin-top: 12px;
+    }
+    .compact-slider .noUi-target {
+      /* width: 100%; */
+      width: 213px;
+      margin: 0 auto;
+    }
+
+.chk_td .chknode {
+  appearance: none;
+  width: 14px;
+  height: 14px;
+  border: 1px solid var(--primary);
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.chk_td .chknode:checked {
+  background-color: var(--primary);
+  border-color: var(--primary);
+}
+.chk_td .chknode:checked::after {
+  content: '';
+  display: block;
+  width: 4px;
+  height: 8px;
+  border: 1px solid #fff; /* 勾的颜色 */
+  border-top: none;
+  border-left: none;
+  transform: rotate(45deg) translate(2px, -3px);
+}
+/* ===== MultiSelect ===== */
+.multi-select {
+  position: relative;
+  max-width: 380px;
+}
+
+.select-input {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 6px 36px 6px 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  cursor: pointer;
+}
+
+.placeholder {
+  color: #a8abb2;
+}
+
+.tag {
+  background: var(--primary);
+  color: #fff;
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+}
+
+.tag span {
+  margin-left: 4px;
+  cursor: pointer;
+}
+
+.clear-btn {
+  position: absolute;
+  right: 8px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+  color: #c0c4cc;
+  display: none;
+}
+
+.multi-select .dropdown {
+  position: absolute;
+  top: calc(100% + 6px);
+  width: 100%;
+  background: #fff;
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgba(0,0,0,.12);
+  max-height: 240px;
+  overflow-y: auto;
+  display: none;
+  z-index: 10;
+}
+
+.multi-select .dropdown.open {
+  display: block;
+}
+
+.multi-select .option {
+  padding: 4px 8px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fund_date {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+}
+.period-switcher {
+      display: flex;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      padding: 4px;
+      flex-wrap: wrap;
+      border-radius: 18px;
+      background: #eee;
+    }
+    .period-switcher > span {
+      padding: 11px 13px;
+      border: 1px solid #eee;
+      border-radius: 14px;
+      font-size: 12px;
+      cursor: pointer;
+      transition: all 0.2s;
+      /* min-width: 42px; */
+      color: #6a6d74;
+    }
+    .period-switcher > span:hover{ background: #f5f5f5; }
+    .period-switcher > span.active{
+      background: #fff;
+      border-color: #fff;
+    }
+    #chart0 {
+      width: calc(100vw - 22px);
+      height: 240px;
+      background: #fff;
+      border-radius: 12px;
+    }
+    #chart {
+      width: calc(100vw - 22px);
+      /* height: 340px; */
+      background: #fff;
+      border-radius: 12px;
+    }
+    #data1table thead th {
+      white-space: nowrap;
+    }
+    #data1table thead th >div:nth-child(1) {
+      display: inline;
+      vertical-align: middle;
+    }
+    .sort-icon {
+      display: inline-flex;
+      flex-direction: column;
+      margin-left: 4px;
+      font-size: 8px;
+      line-height: 8px;
+      color: #fff;
+      vertical-align: middle;
+      gap: 1px;
+    }
+
+    .sort-icon.active {
+      color: #333;
+    }
+  </style>
+</head>
+<body>
+
+  <header>Fund Information</header>
+  <!-- ════════ Tab 栏 ════════ -->
+<div class="tab-bar" id="tabBar">
+  <div class="tab-item active" data-tab="0">
+    <span class="tab-label">Fund Perf.</span>
+    <span class="tab-underline"></span>
+  </div>
+  <div class="tab-item" data-tab="1">
+    <span class="tab-label">Assets Trend</span>
+    <span class="tab-underline"></span>
+  </div>
+  <div class="tab-item" data-tab="2">
+    <span class="tab-label">Price Report</span>
+    <span class="tab-underline"></span>
+  </div>
+</div>
+
+<!-- ════════ 子页面（替换成你自己的内容）════════ -->
+<div class="tab-panels">
+
+  <!-- 页面 0 -->
+  <div class="tab-panel active" id="panel-0">
+    <div class="tabpage-wrapper">
+      <div class="container" id="listPage0">
+        <div class="filter">
+          <div class="filter-group1">
+            <label class="label_title">Scheme</label>
+            <div id="schemeNode1"></div>
+          </div>
+          <div class="filter-group1">
+            <label class="label_title">Fund Type</label>
+            <div id="fundNode1"></div>
+          </div>
+          
+          <div class="commonbtn_wrapper">
+            <button id="common_button" onclick="searchTable1()">Search</button>
+            <button id="common_button" class="reset_btn" onclick="resetFilter()">Reset</button>
+          </div>
+        </div>
+        <!-- 已有的 ul 容器 -->
+         <div class="table-scroll-wrap">
+           <table id="data1table">
+             <thead>
+               <tr>
+                 <th><div>Fund Name</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+                 <th><div>Fund Type</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+                 <th><div>Scheme</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+                 <th data-sort="risk"><div>Risk</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+                 <th data-sort="r1y"><div>1Y</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+                 <th data-sort="fee"><div>Fee</div><div class="sort-icon"><span>▲</span><span>▼</span></div></th>
+               </tr>
+             </thead>
+             <tbody id="fundBody"></tbody>
+           </table>
+         </div>
+        <div class="pagination" id="pagination1">
+          <button onclick="prevPage1()">Prev</button>
+          <span id="pageInfo1">Page 0/0</span>
+          <button onclick="nextPage1()">Next</button>
+        </div>
+        <p class="remark_text">Remark: All data from MPFA as of date: <span class="format_new_date">Apr 13, 2026</span></p>
+      </div>      
+    </div>
+  </div>
+
+  <!-- 页面 1 -->
+  <div class="tab-panel" id="panel-1">
+    <div class="tabpage-wrapper">
+      <div class="container" id="listPage1">
+        <div class="filter1">
+          <div id="chart0"></div>
+          <div class="period-switcher">
+            <span data-period="1M" class="active">1M</span>
+            <span data-period="6M" >6M</span>
+            <span data-period="1Y" >1Y</span>
+            <span data-period="3Y" >3Y</span>
+            <span data-period="5Y">5Y</span>
+            <span data-period="sinceLaunch" >since launch</span>
+          </div>
+         
+          <div class="filter-group long_label">
+            <label class="label_title">Balance of my funds</label>
+            <div id="fundName2"></div>
+            
+            <button class="fixedRefreshBtn" onclick="refreshChart()">↻</button>
+          </div>
+          
+        
+        </div>
+
+
+        <div id="chart"></div>
+        <div id="fixedBar1">
+          <span></span>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- 页面 2 -->
+  <div class="tab-panel" id="panel-2">
+    <div class="tabpage-wrapper">
+      
+      <div class="container" id="listPage2">
+        <div class="filter card-double-2">
+          <div class="filter-group">
+            <label class="label_title">Scheme</label>
+            <div id="schemeNode2"></div>
+          </div>
+          <div class="filter-group">
+            <label class="label_title">Fund Type</label>
+            <div id="fundNode2"></div>
+          </div>
+
+          <div class="filter-group">
+            <label class="label_title">Period</label>
+            <div class="period_wrapper">
+              <input type="date" id="startDate" />
+              <span>~</span>
+              <input type="date" id="endDate"  />
+            </div>
+          </div>
+
+          <div class="commonbtn_wrapper">
+            <button id="common_button" onclick="searchTable2()">Search</button>
+            <button id="common_button" class="reset_btn" onclick="resetFilter2()">Reset</button>
+          </div>
+        </div>
+        <!-- <div class="mainSchema">AIA - Prime Value Choice</div> -->
+         <div class="table-scroll-wrap">
+           <table class="report_table">
+             <thead>
+               <tr>
+                 <th></th>
+                 <th>Fund</th>
+                 <th>Fund Type</th>
+                 <th>Scheme</th>
+                 <th>Risk</th>
+                 <th id="date1_price"></th>
+                 <th id="date2_price"></th>
+                 <th id="date3_price"></th>
+               </tr>
+             </thead>
+             <tbody id="reportTableBody"></tbody>
+           </table>
+         </div>
+
+        <div class="pagination" id="report_table_pagination">
+          <button onclick="prevPage()">Prev</button>
+          <span id="pageInfo"></span>
+          <button onclick="nextPage()">Next</button>
+        </div>
+        <div class="fixed-bar" id="fixedBar">
+          <span id="selectedCount">0 / 10 Selected</span>
+          <button onclick="goDownload()">Download</button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const FUNDS_LIST = ['Age 65 Plus Fund', 'American Fund', 'Asian Bond Fund', 'Asian Equity Fund', 'Balanced Portfolio', 'Capital Stable Portfolio', 'China HK Dynamic Asset Allocation Fund', 'Core Accumulation Fund', 'Eurasia Fund', 'European Equity Fund', 'Global Bond Fund', 'Greater China Equity Fund', 'Green Fund', 'Growth Portfolio', 'Guaranteed Portfolio', 'Hong Kong and China Fund', "Manager's Choice Fund"];
+
+  const tabs   = document.querySelectorAll('.tab-item');
+  const panels = document.querySelectorAll('.tab-panel');
+
+  tabs.forEach(tab => {
+    tab.addEventListener('click', () => {
+      const idx = +tab.dataset.tab;
+
+      // 切换 Tab 激活态
+      tabs.forEach(t => t.classList.remove('active'));
+      tab.classList.add('active');
+
+      // 切换面板
+      panels.forEach(p => p.classList.remove('active'));
+      panels[idx].classList.add('active');
+      document.getElementById('fixedBar').style.display = (idx===2) ? 'flex' : 'none';
+    });
+  });
+
+const schemeOptionsList = [
+    { label: 'All', value: 'All' },
+    { label: 'HSBC-HB', value: 'HSBC-HB' },
+    { label: 'HSBC-FD', value: 'HSBC-FD' },
+    { label: 'HSBC-HS', value: 'HSBC-HS' },
+    { label: 'AIA-VC', value: 'AIA-VC' },
+    { label: 'AIA-MC', value: 'AIA-MC' },
+    { label: 'MS', value: 'MS' },
+    { label: 'CL', value: 'CL' },
+    { label: 'JF', value: 'JF' },
+    { label: 'SK', value: 'SK' },
+  ]
+
+const FUND_OPTIONS=[
+    { label: 'All', value: 'All' },
+    { label: 'Equity Fund', value: 'Equity Fund' },
+    { label: 'Mixed Assets Fund', value: 'Mixed Assets Fund' },
+    { label: 'Bond Fund', value: 'Bond Fund' },
+    { label: 'Guaranteed Fund', value: 'Guaranteed Fund' },
+    { label: 'MPF Conservative Fund', value: 'MPF Conservative Fund' },
+    { label: 'Money Market Fund - Other than MPF Conservative Fund', value: 'Money Market Fund - Other than MPF Conservative Fund' },
+  ]
+
+const reportfundsData = Array.from({length:300},(_,i)=>({
+  id:i,
+  name: FUNDS_LIST[i%(FUNDS_LIST.length)],
+  fundType: FUND_OPTIONS.slice(1)[i%(FUND_OPTIONS.length-1)]?.label,
+  fundScheme: schemeOptionsList.slice(1)[i%(schemeOptionsList.length-1)]?.label,
+  code:`GEF${1000+i}`,
+  risk:Math.floor(Math.random() *7 ) +1,
+  fprice1:+(Math.random()* 400 +100).toFixed(2),
+  fprice2:+(Math.random()* 400 +100).toFixed(2),
+  fprice3:+(Math.random()* 400 +100).toFixed(2),
+}));
+// 初始化一些变量名称
+let typeFilter =[];
+/* ================= MultiSelect ================= */
+class MultiSelect {
+  constructor(el, options) {
+    this.el = document.querySelector(el);
+    this.options = options;
+    this.render();
+    this.bind();
+  }
+
+  render() {
+    this.el.innerHTML = `
+      <div class="multi-select">
+        <div class="select-input"></div>
+        <div class="clear-btn">✕</div>
+        <div class="dropdown"></div>
+      </div>
+    `;
+    this.input = this.el.querySelector('.select-input');
+    this.clearBtn = this.el.querySelector('.clear-btn');
+    this.dropdown = this.el.querySelector('.dropdown');
+
+    this.placeholder = document.createElement('span');
+    this.placeholder.className = 'placeholder';
+    this.placeholder.textContent = this.options.placeholder;
+    this.input.appendChild(this.placeholder);
+
+    this.options.options.forEach(opt => {
+      const label = document.createElement('label');
+      label.className = 'option';
+      label.innerHTML = `<input type="checkbox" value="${opt.value}"> ${opt.label}`;
+      this.dropdown.appendChild(label);
+    });
+  }
+
+   // 公共方法：设置选中的值（参数为数组，如 ['ALL']）
+  setValue(values) {
+    const inputs = this.dropdown.querySelectorAll('input');
+    inputs.forEach(input => {
+      input.checked = values.includes(input.value);
+    });
+    this.renderTags();
+  }
+
+  getValue() {
+    const checked = [...this.dropdown.querySelectorAll('input')]
+      .filter(i => i.checked)
+      .map(i => i.value);
+    return checked;
+  }
+
+  clear() {
+   this.dropdown.querySelectorAll('input').forEach(i => i.checked = false);
+   this.renderTags();
+  }
+
+  bind() {
+    this.input.onclick = () => {
+      this.dropdown.classList.toggle('open');
+    };
+
+    this.clearBtn.onclick = (e) => {
+      e.stopPropagation();
+      this.dropdown.querySelectorAll('input').forEach(i => i.checked = false);
+      this.renderTags();
+    };
+
+    this.dropdown.querySelectorAll('input').forEach(cb => {
+      cb.onchange = () => this.renderTags();
+    });
+
+    document.addEventListener('click', (e) => {
+      if (!this.el.contains(e.target)) {
+        this.dropdown.classList.remove('open');
+      }
+    });
+  }
+
+  renderTags() {
+    this.input.innerHTML = '';
+    const checked = [...this.dropdown.querySelectorAll('input')].filter(i => i.checked);
+
+    if (!checked.length) {
+      this.input.appendChild(this.placeholder);
+      this.clearBtn.style.display = 'none';
+    } else {
+      this.clearBtn.style.display = 'block';
+      checked.forEach(cb => {
+        const tag = document.createElement('div');
+        tag.className = 'tag';
+        tag.innerHTML = `${cb.value}<span>✕</span>`;
+        tag.querySelector('span').onclick = (e) => {
+          e.stopPropagation();
+          cb.checked = false;
+          this.renderTags();
+        };
+        this.input.appendChild(tag);
+      });
+    }
+
+    this.options.onChange?.(checked.map(i => i.value));
+  }
+}
+    //应用scheme组件
+    const schemeNode1Select = new MultiSelect('#schemeNode1', {
+      placeholder: 'select scheme',
+      options: schemeOptionsList,
+      onChange: (v) => {
+        console.log('account-Select:', v)
+      }
+    });
+    const schemeNodeSelect2 = new MultiSelect('#schemeNode2', {
+      placeholder: 'select scheme',
+      options: schemeOptionsList,
+      onChange: (v) => {
+        console.log('account-Select:', v)
+      }
+    });
+
+  //应用组件
+  const fundtypesSelect = new MultiSelect('#fundNode1', {
+    placeholder: 'select type',
+    options: FUND_OPTIONS,
+    onChange: (v) => {
+      console.log('-fundtypeSelect1:', v)
+    }
+  });
+  const fundtypesSelect2 = new MultiSelect('#fundNode2', {
+    placeholder: 'select type',
+    options: FUND_OPTIONS,
+    onChange: (v) => {
+      console.log('fundtypeSelect2:', v)
+    }
+  }); 
+
+  let sortKey = '';
+  let sortDir = 1;
+  let page1 = 1;
+  const pageSize1 = 20;
+
+  const schemadataList = FUNDS_LIST.map((val, index) => ({
+      id: index,
+      trustee: 'AIA',
+      schema: val,
+      group: `AIA - Prime Value Choice`,
+      name: val,
+      r3m: (Math.random() * 5).toFixed(2) + '%',
+      r1y: (Math.random() * 12).toFixed(2),
+      risk: Math.floor(Math.random() * 7) + 1,
+      fee: (0.6 + Math.random()).toFixed(2) + '%',
+    }))
+
+    function randomPercent() {
+      const min = 2, max = 15;
+      const value = (Math.random() * (max - min) + min).toFixed(2);
+      return value + '%';
+    }
+
+    /* ---------- filtering ---------- */
+    const table1Data = Array.from({length:300},(_,i)=>({
+      id:i,
+      name: FUNDS_LIST[i%(FUNDS_LIST.length)],
+      fundType: FUND_OPTIONS.slice(1)[i%(FUND_OPTIONS.length-1)]?.label,
+      fundScheme: schemeOptionsList.slice(1)[i%(schemeOptionsList.length-1)]?.label,
+      code:`GEF${1000+i}`,
+      risk:Math.floor(Math.random() *7 ) +1,
+      r1y: (Math.random() * 12).toFixed(2),
+      fee: (0.6 + Math.random()).toFixed(2) + '%'
+    }));
+    function getFiltered() {
+      const start = (page1 - 1) * pageSize1;
+      const sortData = table1Data.slice(start, start + pageSize1);
+      const leftData = table1Data.slice(start + pageSize1);
+      console.warn('list1data---: ', sortData,'---allldata: ', leftData  )
+      if (sortKey) {
+        sortData.sort((a, b) => {
+          let v1 = a[sortKey];
+          let v2 = b[sortKey];
+          v1 = typeof (v1) === 'string' ? Number(v1?.replace('%', '')) : Number(v1);
+          v2 = typeof (v2) === 'string' ? Number(v2?.replace('%', '')) : Number(v2);
+          if (v1 < v2) return -1 * sortDir;
+          if (v1 > v2) return 1 * sortDir;
+          return 0;
+        });
+      }
+      return [].concat(sortData, leftData);
+    }
+
+    function searchTable1() {
+      schemeNode1Select.setValue(['ALL'])
+      renderTable1()
+    }
+
+    function searchTable2() {
+      typeFilter = fundtypesSelect2.getValue();
+      page =1;
+      renderReportTable();
+    }
+
+    function resetFilter() {
+      schemeNode1Select.clear()
+      fundtypesSelect.clear()
+    }
+    function resetFilter2() {
+      schemeNodeSelect2.clear()
+      fundtypesSelect2.clear()
+    }
+
+    /* ---------- render table ---------- */
+    function renderTable1() {
+      const data = getFiltered();
+      const tbody = document.getElementById('fundBody');
+      tbody.innerHTML = '';
+
+      const start = (page1 - 1) * pageSize1;
+      const pageData = data.slice(start, start + pageSize1);
+
+      pageData.forEach(f => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td class="fund-name">${f.name}</td>
+          <td class="fund-name">${f.fundType}</td>
+          <td class="fund-name">${f.fundScheme}</td>
+          <td><span class="riskText risk-${f.risk}">Class ${f.risk}</span></td>
+          <td>${f.r1y}%</td>
+          <td>${f.fee}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+
+      renderPagination(data.length);
+    }
+
+    let totalPages1 = 1;
+
+    /* ---------- improved pagination ---------- */
+    function renderPagination(total) {
+      totalPages1 = Math.ceil(total / pageSize1);
+      pageInfo1.textContent=`Page ${page1} / ${totalPages1}`;
+    }
+
+    function prevPage1() { if (page1 > 1) { page1--; renderTable1(); } };
+    function nextPage1() { 
+      if (page1 < totalPages1) { page1++; renderTable1(); } 
+    };
+
+    Array.from(document.querySelectorAll('th[data-sort]')).forEach(th => {
+      th.addEventListener('click', () => {
+        const key = th.dataset.sort;
+        if (sortKey === key) {
+          sortDir = -sortDir;
+        } else {
+          sortKey = key;
+          sortDir = 1;
+        }
+        document.querySelectorAll('.sort-icon').forEach(i => i.classList.remove('active'));
+        th.querySelector('.sort-icon').classList.add('active');
+        page1 = 1;
+        renderTable1();
+      });
+    });
+
+    
+  const pageSize = 20; let page = 1;
+  let selectedIDmap = new Set();
+  let riskRange1=[1,6];
+
+  function filterReportTable(){ 
+    return reportfundsData.filter(f=> {
+      const riskok = f.risk>=riskRange1[0] && f.risk<=riskRange1[1];
+      const typeok = typeFilter.length>0 && typeFilter.includes(f.type);
+      return riskok;
+    }); 
+  }
+
+  function formatDate(dateStr, offsetDays = 0) {
+    const date = new Date(dateStr);
+    date.setDate(date.getDate() + offsetDays);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' }).replace(' ', '-'); // "Mar 5" → "Mar-5"
+  }
+
+  const startDate = document.getElementById('startDate');
+  const endDate = document.getElementById('endDate');
+
+  startDate.addEventListener('change', () => {
+    const start = new Date(startDate.value);
+  
+  // min = 开始日期当天
+  const min = startDate.value;
+  // console.log(formatDate(min, 0)); // Mar-5
+  // console.log(formatDate(min, 1)); // Mar-6
+  // console.log(formatDate(min, 2)); // Mar-7
+  document.getElementById('date1_price').textContent = formatDate(min, 0);
+  document.getElementById('date2_price').textContent = formatDate(min, 1);
+  document.getElementById('date3_price').textContent = formatDate(min, 2);
+
+    // max = 开始日期 + 30天
+    const maxDate = new Date(start);
+    maxDate.setDate(maxDate.getDate() + 30);
+    const max = maxDate.toISOString().split('T')[0];
+
+    endDate.min = min;
+    endDate.max = max;
+
+    // 若已选的结束日期超出范围，则清空
+    if (endDate.value && (endDate.value < min || endDate.value > max)) {
+      endDate.value = '';
+    }
+  });
+
+  function renderReportTable(){
+    const listData = filterReportTable();
+    console.log({typeFilter,riskRange1}, '====render-table===>>>', listData)
+    const start=(page-1)*pageSize;
+    reportTableBody.innerHTML= listData.slice(start,start+pageSize).map(f=>`
+      <tr>
+        <td class="chk_td"><input class="chknode" type="checkbox" ${selectedIDmap.has(f.id)?'checked':''} onchange="toggle(${f.id})"></td>
+        <td>${f.name}</td>
+        <td>${f.fundType}</td>
+        <td>${f.fundScheme}</td>
+        <td><span class="riskText risk-${f.risk}">Class ${f.risk}</span></td>
+        <td>${f.fprice1}</td>
+        <td>${f.fprice2}</td>
+        <td>${f.fprice3}</td>
+      </tr>`).join('');
+    const pageCount = Math.ceil(listData.length /pageSize)
+    pageInfo.textContent=`Page ${page} / ${pageCount}`;
+    selectedCount.textContent=`${selectedIDmap.size} / 10 Selected`;
+  }
+
+  function toggle(id){ 
+    if(selectedIDmap.has(id)) {
+      selectedIDmap.delete(id);
+    } else if(selectedIDmap.size< 10) {
+      selectedIDmap.add(id);
+    }
+    renderReportTable();
+  }
+  function prevPage(){ if(page>1){page--; renderReportTable();}}
+  function nextPage(){ if(page*pageSize<filterReportTable().length){page++; renderReportTable();}}
+
+  function goDownload(){
+    console.log('=====goDownload=====')
+  }
+
+  // renderReportTable();
+
+    // 第二部分的逻辑
+  
+    let fundTextList=[];
+
+    const FUND_LIST_OPTIONS = [{label:'All', value:'All'}].concat(FUNDS_LIST.map(v=> ({label:v, value:v})))
+
+    //应用组件
+    new MultiSelect('#fundName2', {
+      placeholder: 'select fund',
+      options: FUND_LIST_OPTIONS,
+      onChange: (v) => {
+        fundTextList = v;
+        console.log('fund-code-Select2:', v)
+      }
+    });
+
+    
+    let fundsList2 = [];
+    let schemaList = fundsList2.map((val, index) => ({
+      id: index,
+      name: val,
+    }));
+
+    let selected = new Set([0, 1, 2]);
+    let currentPeriod = '1M';
+    let chartInstance = null;
+    const chartInstances = {};   // { [id]: echartsInstance }
+
+    function resetSchemeList() {
+      schemaList = fundTextList.map((val, index) => ({
+        id: index,
+        name: val,
+      }));
+      selected = new Set(schemaList.map((_, i) =>i));
+    }
+    function refreshChart() {
+      resetSchemeList()
+      drawChart();
+    }
+    
+    drawChart0();
+    refreshChart();
+
+    document.querySelector('.period-switcher').addEventListener('click', (e) =>{
+      const span = e.target.closest('span[data-period]');
+      if(!span) return;
+      switchPeriod(span.dataset.period);
+    })
+
+    function switchPeriod(period) {
+      currentPeriod = period;
+      updatePeriodButtons();
+      resetSchemeList();
+      drawChart();
+    }
+
+    function updatePeriodButtons() {
+      document.querySelectorAll('.period-switcher span').forEach(btn => {
+        btn.classList.toggle('active', btn.dataset.period === currentPeriod);
+      });
+    }
+
+    function getChartDataPoints(period) {
+      const configs = {
+        '1M': { count: 30, labels: Array.from({ length: 30 }, (_, i) => `${i + 1}-Jan, 2025`) },
+        '6M': { count: 12, labels: ["1-Jan, 2025","16-Jan, 2025","31-Jan, 2025","15-Feb, 2025","2-Mar, 2025","17-Mar, 2025","1-Apr, 2025","16-Apr, 2025","1-May, 2025","16-May, 2025","31-May, 2025","15-Jun, 2025"] },
+        '1Y': { count: 12, labels: ["1-Jan","1-Feb","1-Mar","1-Apr","1-May","1-Jun","1-Jul","1-Aug","1-Sep","1-Oct","1-Nov","1-Dec"] },
+        '3Y': { count: 12, labels: ["1-Jan","1-Apr","1-Jul","1-Oct","1-Jan","1-Apr","1-Jul","1-Oct","1-Jan","1-Apr","1-Jul","1-Oct"] },
+        '5Y': { count: 12, labels: ["1-Jan","1-Feb","1-Mar","1-Apr","1-May","1-Jun","1-Jul","1-Aug","1-Sep","1-Oct","1-Nov","1-Dec"] },
+        'since launch': { count: 12, labels: ["1-Jan","1-Apr","1-Jul","1-Oct","1-Jan","1-Apr","1-Jul","1-Oct","1-Jan","1-Apr","1-Jul","1-Oct"] },
+      };
+      return configs[period] || configs['1M'];
+    }
+
+    function drawChart0() {
+      if (!chartInstance) {
+        chartInstance = echarts.init(document.getElementById('chart0'));
+      }
+
+      const { count, labels } = getChartDataPoints(currentPeriod);
+
+      // 生成 Total Net Count（平稳递增，每期固定小幅增加）
+      let baseContrib = 28000 + Math.random() * 4000;
+      const contribStep = 60 + Math.random() * 40;
+      const contribData = [];
+      for (let i = 0; i < count; i++) {
+        baseContrib += contribStep;
+        contribData.push(+baseContrib.toFixed(2));
+      }
+
+      // 生成 Assets（明显波动，有涨有跌，总体趋势向上）
+      let rawFunddata = contribData[0] * 1.05 + Math.random() * 1000;
+      const assetsData = [];
+      const volatility = (contribData[0] * 0.015);  // 波动幅度约为资产1.5%
+      for (let i = 0; i < count; i++) {
+        // 随机涨跌，70%概率上涨，30%概率下跌
+        const direction = Math.random() < 0.7 ? 1 : -1;
+        const change = direction * (Math.random() * volatility);
+        // 叠加微弱长期趋势
+        rawFunddata += change + contribStep * 0.3;
+        assetsData.push(+rawFunddata.toFixed(2));
+      }
+
+      // 差额 Gain-Loss = Assets - Total Net Count
+      const gainLossData = assetsData.map((v, i) => +(v - contribData[i]).toFixed(2));
+
+      chartInstance.setOption({
+        tooltip: { trigger: 'axis' },
+        legend: { top: 36, left: 'center', textStyle: { fontSize: 10 } },
+        grid: { left: 70, right: 40, top: 80, bottom: 40 },
+        xAxis: { type: 'category', data: labels,
+          axisLabel: {
+            formatter: value => {
+              const lastSpaceIndex = value.lastIndexOf(',');
+              return value.substring(0, lastSpaceIndex) + '\n' + value.substring(lastSpaceIndex + 1);
+            }
+          },
+        },
+        yAxis: {
+          type: 'value',
+          splitNumber: 6,
+          min: value => {
+            const range = value.max - value.min;
+            const result = value.min - range * 0.3;
+            const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+            return Math.floor(result / magnitude) * magnitude;
+          },
+          max: value => {
+            const range = value.max - value.min;
+            const result = value.max + range * 0.3;
+            const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+            return Math.ceil(result / magnitude) * magnitude;
+          },
+          axisLine: { show: true, lineStyle: { color: '#fac858' } },
+        },
+        series: [
+          {
+            name: 'Assets',
+            type: 'line',
+            data: assetsData,
+            showSymbol: false,
+            smooth: true,
+            color: '#fac858',
+          },
+          {
+            name: 'Total Net Count',
+            type: 'line',
+            data: contribData,
+            showSymbol: false,
+            smooth: true,
+            color: '#5470c6',
+            lineStyle: { type: 'dashed' },
+          },
+          {
+            name: 'Gain-Loss',
+            type: 'line',
+            data: gainLossData,
+            showSymbol: false,
+            smooth: true,
+            color: '#91cc75',
+            lineStyle: { type: 'dotted' },
+          },
+        ],
+      }, true);
+    }
+
+    function drawChart() {
+      const { count, labels } = getChartDataPoints(currentPeriod);
+      const selectedList = [...selected];
+      const container = document.getElementById('chart');
+      // 颜色列表
+      const colors = ['#5470c6', '#ee6666', '#73c0de', '#3ba272', '#fc8452', '#9a60b4', '#ea7ccc'];
+
+      // 1. 销毁已不在 selected 中的实例，移除对应 dom
+      Object.keys(chartInstances).forEach(id => {
+        if (!selected.has(id)) {
+          chartInstances[id].dispose();
+          delete chartInstances[id];
+          const el = document.getElementById('chart-panel-' + id);
+          if (el) el.remove();
+        }
+      });
+
+      // 2. 按 selectedList 顺序，确保 dom 顺序与选择顺序一致
+      selectedList.forEach(id => {
+        let el = document.getElementById('chart-panel-' + id);
+        if (!el) {
+          el = document.createElement('div');
+          el.id = 'chart-panel-' + id;
+          el.style.cssText = 'width:100%;height:210px;margin-bottom:10px;';
+        }
+        container.appendChild(el);   // 已存在的节点 append 会自动移到末尾保持顺序
+
+        if (!chartInstances[id]) {
+          chartInstances[id] = echarts.init(el);
+        }
+
+        const f = schemaList.find(x => x.id === id);
+
+        // 生成 Total Net Count（平稳递增，每期固定小幅增加）
+        let baseContrib = 8000 + Math.random() * 4000;
+        const contribStep = 50 + Math.random() * 30;
+        const contribData = [];
+        for (let i = 0; i < count; i++) {
+          baseContrib += contribStep;
+          contribData.push(+baseContrib.toFixed(2));
+        }
+        // 生成 Assets（明显波动，有涨有跌，总体趋势向上）
+        let rawFunddata = contribData[0] * 1.05 + Math.random() * 800;
+        const assetsData = [];
+        const volatility = (contribData[0] * 0.015);  // 波动幅度约为资产1.5%
+        for (let i = 0; i < count; i++) {
+          const direction = Math.random() < 0.7 ? 1 : -1;
+          const change = direction * (Math.random() * volatility);
+          rawFunddata += change + contribStep * 0.3;
+          assetsData.push(+rawFunddata.toFixed(2));
+        }
+
+        // 差额 Gain-Loss = Assets - Total Net Count
+        const gainLossData = assetsData.map((v, i) => +(v - contribData[i]).toFixed(2));
+
+
+        chartInstances[id].setOption({
+          tooltip: { trigger: 'axis' },
+          title: {
+            text: f?.name ?? '',
+            left: 70,
+            top: 4,
+            textStyle: { fontSize: 11, fontWeight: 'normal', color: colors[id % colors.length] },
+          },
+          legend: { top: 18, left: 70, right: 10, textStyle: { fontSize: 9 }, itemWidth: 12, itemHeight: 8 },
+          grid: { left: 70, right: 40, top: 52, bottom: 30 },
+          xAxis: { type: 'category', data: labels,
+            axisLabel: {
+              formatter: value => {
+                const lastSpaceIndex = value.lastIndexOf(',');
+                return value.substring(0, lastSpaceIndex) + '\n' + value.substring(lastSpaceIndex + 1);
+              }
+            },
+          },
+          yAxis: {
+            type: 'value',
+            splitNumber: 4,
+            min: value => {
+              const range = value.max - value.min;
+              const result = value.min - range * 0.3;
+              const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+              return Math.floor(result / magnitude) * magnitude;
+            },
+            max: value => {
+              const range = value.max - value.min;
+              const result = value.max + range * 0.3;
+              const magnitude = Math.pow(10, Math.floor(Math.log10(Math.abs(range) || 1)));
+              return Math.ceil(result / magnitude) * magnitude;
+            },
+            axisLine: { show: true, lineStyle: { color: colors[id % colors.length] } },
+            
+          },
+          series: [
+            {
+              name: 'Assets',
+              type: 'line',
+              data: assetsData,
+              showSymbol: false,
+              smooth: true,
+              color: colors[id % colors.length],
+            },
+            {
+              name: 'Total Net Count',
+              type: 'line',
+              data: contribData,
+              showSymbol: false,
+              smooth: true,
+              color: '#5470c6',
+              lineStyle: { type: 'dashed' },
+            },
+            {
+              name: 'Gain-Loss',
+              type: 'line',
+              data: gainLossData,
+              showSymbol: false,
+              smooth: true,
+              color: '#91cc75',
+              lineStyle: { type: 'dotted' },
+            },
+          ],
+        }, true);
+        console.warn('everydata: ', id, 'name: ', f.name, 'assets:', assetsData, 'contrib:', contribData, 'gainLoss:', gainLossData)
+      });
+    }
+
+    // renderTable1();
+
+    const date = new Date(); // 当前日期
+    const formattedDate = date.toLocaleDateString('en-US', {
+      month: 'short',   // 缩写月份，如 Apr
+      day: 'numeric',   // 日期，如 13
+      year: 'numeric'   // 年份，如 2026
+    });
+    document.querySelector('.format_new_date').textContent = formattedDate;
+
+
+</script>
+</body>
+</html>
