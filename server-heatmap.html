@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>节点负载热力图</title>
+<style>
+:root{--bg:#e9ece8;--card:#f7f8f5;--ink:#1b2b2f;--mut:#5d6e70;--line:#d3d9d4;--acc:#0f5c63;
+--l0:#cfe7dc;--t0:#1f4a3a;--l1:#f1e19a;--t1:#5a4a0a;--l2:#eea35f;--t2:#5a2c05;--l3:#c8372f;--t3:#fff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.5 "PingFang SC","Microsoft YaHei","Noto Sans SC",system-ui,sans-serif;font-variant-numeric:tabular-nums}
+.wrap{max-width:1280px;margin:0 auto;padding:24px 20px 40px}
+header{display:flex;flex-wrap:wrap;gap:16px;justify-content:space-between;align-items:flex-end;margin-bottom:18px}
+h1{margin:0;font-size:24px;font-weight:700;letter-spacing:.5px}
+.sub{color:var(--mut);margin-top:2px}
+.seg{display:inline-flex;background:#dde2dd;border-radius:8px;padding:3px}
+.seg button{border:0;background:none;padding:7px 16px;border-radius:6px;font:inherit;color:var(--mut);cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--ink);color:#fff}
+button:focus-visible,.c:focus-visible{outline:2px solid var(--acc);outline-offset:1px}
+.stats{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:14px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px 16px;text-align:left;font:inherit;color:inherit}
+.stat b{display:block;font-size:26px;line-height:1.2}
+.stat span{color:var(--mut);font-size:12.5px}
+button.stat{cursor:pointer}button.stat:hover{border-color:var(--acc)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;margin-bottom:14px}
+.bar{display:flex;flex-wrap:wrap;gap:8px 18px;align-items:center;justify-content:space-between;margin-bottom:12px}
+.legend{display:flex;flex-wrap:wrap;gap:6px}
+.legend button{display:flex;align-items:center;gap:7px;border:1px solid var(--line);background:#fff;border-radius:999px;padding:3px 12px 3px 5px;font:inherit;font-size:12.5px;cursor:pointer}
+.legend button[aria-pressed=true]{border-color:var(--ink);box-shadow:inset 0 0 0 1px var(--ink)}
+.sw{width:16px;height:16px;border-radius:50%}
+.legend em{font-style:normal;color:var(--mut)}
+label.chk{color:var(--mut);font-size:13px;cursor:pointer;user-select:none}
+.scroll{overflow-x:auto;padding-bottom:4px}
+.grid{min-width:900px}
+.row{display:grid;grid-template-columns:104px repeat(24,minmax(28px,1fr)) 56px;gap:2px;margin-bottom:2px;align-items:stretch}
+.hd{font-size:11px;color:var(--mut);text-align:center}
+.rl{display:flex;flex-direction:column;justify-content:center;padding-left:8px;border-radius:5px;line-height:1.2;font-weight:600;font-size:13px}
+.rl small{font-weight:400;color:var(--mut);font-size:11px}
+.row.on .rl{background:#dbe6e3;box-shadow:inset 3px 0 var(--acc)}
+.c{height:30px;border:0;border-radius:4px;padding:0;font:10.5px/1 inherit;font-family:inherit;font-variant-numeric:tabular-nums;cursor:pointer;transition:opacity .15s}
+.c.v0{background:var(--l0);color:var(--t0)}.c.v1{background:var(--l1);color:var(--t1)}
+.c.v2{background:var(--l2);color:var(--t2)}.c.v3{background:var(--l3);color:var(--t3)}
+.c.hid{font-size:0}
+.c.dim{opacity:.2}
+.c.sel{outline:2px solid var(--ink);outline-offset:-1px;z-index:1;position:relative}
+.row .c.col{box-shadow:0 0 0 1px rgba(27,43,47,.25)}
+.pk{cursor:default}
+#tip{position:fixed;pointer-events:none;background:var(--ink);color:#fff;border-radius:8px;padding:9px 12px;font-size:12.5px;line-height:1.55;opacity:0;transition:opacity .1s;z-index:9;min-width:170px}
+#tip.show{opacity:1}
+#tip b{font-size:14px}#tip .tag{display:inline-block;padding:0 7px;border-radius:9px;font-size:11.5px;margin-left:6px}
+#tip .m{color:#aebdbe}
+.dgrid{display:grid;grid-template-columns:1fr 240px;gap:20px}
+.dh{display:flex;align-items:baseline;gap:10px;margin-bottom:6px}
+.dh h2{margin:0;font-size:17px}.dh span{color:var(--mut)}
+svg{width:100%;height:auto;display:block}
+svg text{font-size:11px;fill:var(--mut);font-family:inherit}
+.dk{display:grid;grid-template-columns:1fr 1fr;gap:10px;align-content:start}
+.dk div{border-left:3px solid var(--line);padding-left:10px}
+.dk b{display:block;font-size:20px}.dk span{color:var(--mut);font-size:12px}
+.key{font-size:12px;color:var(--mut);margin-top:4px;display:flex;gap:16px}
+.key i{display:inline-block;width:18px;height:0;border-top:2.5px solid var(--acc);vertical-align:middle;margin-right:5px}
+.key i.d{border-top:2px dashed #7f8f91}
+@media(max-width:860px){.stats{grid-template-columns:1fr 1fr}.dgrid{grid-template-columns:1fr}}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header>
+  <div><h1>节点负载热力图</h1><div class="sub">16 个服务器节点 × 最近 24 小时 · 演示数据(随机但固定)</div></div>
+  <div class="seg" id="seg" role="group" aria-label="指标">
+    <button data-m="cpu">CPU 使用率</button><button data-m="mem">内存使用率</button><button data-m="rt">响应时间</button>
+  </div>
+</header>
+
+<div class="stats" id="stats"></div>
+
+<div class="card">
+  <div class="bar">
+    <div class="legend" id="legend"></div>
+    <label class="chk"><input type="checkbox" id="vals" checked> 显示数值</label>
+  </div>
+  <div class="scroll"><div class="grid" id="grid"></div></div>
+</div>
+
+<div class="card">
+  <div class="dh"><h2 id="dt"></h2><span id="ds"></span></div>
+  <div class="dgrid">
+    <div><svg id="chart" viewBox="0 0 640 260" role="img" aria-label="节点全天趋势"></svg>
+      <div class="key"><span><i></i>当前节点</span><span><i class="d"></i>全部节点同时段均值</span><span>点击折线上的点可切换小时</span></div></div>
+    <div class="dk" id="dk"></div>
+  </div>
+</div>
+</div>
+<div id="tip"></div>
+
+<script>
+(function(){
+const $=s=>document.querySelector(s);
+const HRS=[...Array(24).keys()];
+const LV=['正常','关注','警告','高风险'];
+const M={
+  cpu:{name:'CPU 使用率',th:[50,70,85],f:v=>v.toFixed(0)+'%',max:100},
+  mem:{name:'内存使用率',th:[60,75,88],f:v=>v.toFixed(0)+'%',max:100},
+  rt:{name:'响应时间',th:[200,400,800],f:v=>v.toFixed(0)+'ms',max:3000}
+};
+const lvl=(v,m)=>M[m].th.filter(t=>v>=t).length;
+const range=(m,i)=>{const t=M[m].th,u=m==='rt'?'ms':'%';return i==0?'< '+t[0]+u:i==3?'≥ '+t[2]+u:t[i-1]+'–'+t[i]+u};
+
+/* 演示数据:固定随机种子,带昼夜规律与几个“事故” */
+let seed=20261004;const R=()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;
+const N=()=>R()+R()+R()-1.5;
+const roles={web:['Web',30,12,52,14,58],api:['API',38,14,58,15,95],db:['数据库',42,16,66,14,70],cache:['缓存',22,8,70,13,45],job:['任务',18,50,48,3,85],gw:['网关',34,13,45,14,40]};
+const nodes=[];
+[['web',4],['api',4],['db',2],['cache',2],['job',2],['gw',2]].forEach(([k,n])=>{for(let i=1;i<=n;i++)nodes.push({id:k+'-0'+i,role:roles[k][0],p:roles[k]})});
+const D={cpu:[],mem:[],rt:[]};
+nodes.forEach((nd,i)=>{
+  const [,cb,amp,mb,pk,rb]=nd.p;const c=[],m=[],r=[];
+  const leak=nd.id==='api-03';
+  HRS.forEach(h=>{
+    let d=Math.min(Math.abs(h-pk),24-Math.abs(h-pk));
+    let wave=Math.exp(-d*d/(2*3.2*3.2));
+    let cp=cb+amp*1.5*wave+N()*9;
+    if(nd.id==='db-01'&&h>=14&&h<=16)cp+=34;
+    if(nd.id==='job-02'&&h>=2&&h<=4)cp+=22;
+    if(nd.id==='web-04'&&h>=19&&h<=21)cp+=28;
+    cp=Math.max(3,Math.min(99,cp));
+    let mp=mb+wave*6+N()*3+(leak?h*1.35:0)+h*.15;
+    if(nd.id==='cache-02')mp+=18;
+    mp=Math.max(10,Math.min(99,mp));
+    let rt=rb*(1+Math.pow(cp/100,3)*5)+N()*rb*.25;
+    if(nd.id==='gw-02'&&h>=9&&h<=11)rt+=520;
+    if(nd.id==='db-01'&&h>=14&&h<=16)rt+=900;
+    rt=Math.max(12,Math.min(2900,rt));
+    c.push(+cp.toFixed(1));m.push(+mp.toFixed(1));r.push(Math.round(rt));
+  });
+  D.cpu.push(c);D.mem.push(m);D.rt.push(r);
+});
+const clusterAvg=m=>HRS.map(h=>D[m].reduce((s,r)=>s+r[h],0)/nodes.length);
+
+const S={m:'cpu',n:0,h:0,focus:null,vals:true};
+const pad=h=>String(h).padStart(2,'0');
+
+function selectPeak(){ // 默认选中当前指标最严重的单元格
+  let b=[-1,0,0];D[S.m].forEach((r,n)=>r.forEach((v,h)=>{if(v>b[0])b=[v,n,h]}));S.n=b[1];S.h=b[2];
+}
+
+function render(){
+  const m=S.m,cfg=M[m],data=D[m];
+  document.querySelectorAll('#seg button').forEach(b=>b.setAttribute('aria-pressed',b.dataset.m===m));
+  /* 统计 */
+  let sum=0,mx=[-1,0,0],hi=0,hn=new Set(),cnt=[0,0,0,0];
+  data.forEach((r,n)=>r.forEach((v,h)=>{sum+=v;if(v>mx[0])mx=[v,n,h];const l=lvl(v,m);cnt[l]++;if(l==3){hi++;hn.add(n)}}));
+  const ca=clusterAvg(m),bh=ca.indexOf(Math.max(...ca));
+  $('#stats').innerHTML=
+   `<div class="stat"><span>全局平均值</span><b>${cfg.f(sum/(nodes.length*24))}</b><span>${cfg.name}</span></div>`+
+   `<button class="stat" data-go="${mx[1]},${mx[2]}"><span>峰值(点击定位)</span><b>${cfg.f(mx[0])}</b><span>${nodes[mx[1]].id} · ${pad(mx[2])}:00</span></button>`+
+   `<div class="stat"><span>高风险单元格(${range(m,3)})</span><b style="color:var(--l3)">${hi}</b><span>占 ${(hi/(nodes.length*24)*100).toFixed(1)}%,涉及 ${hn.size} 个节点</span></div>`+
+   `<div class="stat"><span>全局最繁忙时段</span><b>${pad(bh)}:00</b><span>此时段均值 ${cfg.f(ca[bh])}</span></div>`;
+  /* 图例 */
+  $('#legend').innerHTML=LV.map((n,i)=>`<button data-f="${i}" aria-pressed="${S.focus===i}"><i class="sw" style="background:var(--l${i})"></i>${n} <em>${range(m,i)}</em> · ${cnt[i]}</button>`).join('');
+  /* 矩阵 */
+  let h='<div class="row"><div></div>'+HRS.map(x=>`<div class="hd">${pad(x)}</div>`).join('')+'<div class="hd">峰值</div></div>';
+  nodes.forEach((nd,n)=>{
+    const r=data[n],pv=Math.max(...r);
+    h+=`<div class="row${n===S.n?' on':''}"><div class="rl">${nd.id}<small>${nd.role}</small></div>`+
+      r.map((v,x)=>{const l=lvl(v,m);return `<button class="c v${l}${S.vals?'':' hid'}${S.focus!==null&&S.focus!==l?' dim':''}${n===S.n&&x===S.h?' sel':''}" data-n="${n}" data-h="${x}" aria-label="${nd.id} ${pad(x)}点 ${cfg.name} ${cfg.f(v)} ${LV[l]}">${cfg.f(v).replace(/[%]|ms/,'')}</button>`}).join('')+
+      `<div class="c pk v${lvl(pv,m)}${S.focus!==null&&S.focus!==lvl(pv,m)?' dim':''}" style="display:flex;align-items:center;justify-content:center">${cfg.f(pv).replace(/[%]|ms/,'')}</div></div>`;
+  });
+  $('#grid').innerHTML=h;
+  detail();
+}
+
+function detail(){
+  const m=S.m,cfg=M[m],r=D[m][S.n],nd=nodes[S.n],ca=clusterAvg(m);
+  $('#dt').textContent=nd.id+' · '+nd.role+' · '+cfg.name+'全天趋势';
+  $('#ds').textContent='已选 '+pad(S.h)+':00 — '+cfg.f(r[S.h])+'('+LV[lvl(r[S.h],m)]+')';
+  const mx=Math.max(...r),mn=Math.min(...r),avg=r.reduce((a,b)=>a+b,0)/24,hi=r.filter(v=>lvl(v,m)==3).length;
+  $('#dk').innerHTML=[['均值',cfg.f(avg),''],['峰值',cfg.f(mx),pad(r.indexOf(mx))+':00'],['最低',cfg.f(mn),pad(r.indexOf(mn))+':00'],['高风险时长',hi+' 小时',hi?'需要关注':'无']]
+   .map(a=>`<div><span>${a[0]}</span><b>${a[1]}</b><span>${a[2]}</span></div>`).join('');
+  const W=640,H=260,ml=46,mr=14,mt=14,mb=28,t=cfg.th;
+  const yMax=Math.max(mx*1.12,t[2]*1.15,...ca)>cfg.max?cfg.max:Math.max(mx*1.12,t[2]*1.15);
+  const x=h=>ml+(W-ml-mr)*h/23,y=v=>H-mb-(H-mt-mb)*Math.min(v,yMax)/yMax;
+  const b=[0,t[0],t[1],t[2],yMax];let s='';
+  for(let i=0;i<4;i++)s+=`<rect x="${ml}" y="${y(b[i+1])}" width="${W-ml-mr}" height="${y(b[i])-y(b[i+1])}" fill="var(--l${i})" opacity=".45"/>`;
+  t.forEach(v=>s+=`<line x1="${ml}" x2="${W-mr}" y1="${y(v)}" y2="${y(v)}" stroke="#8a9a9a" stroke-dasharray="3 3"/><text x="${ml-6}" y="${y(v)+4}" text-anchor="end">${cfg.f(v)}</text>`);
+  s+=`<text x="${ml-6}" y="${y(0)+4}" text-anchor="end">0</text>`;
+  for(let h=0;h<24;h+=3)s+=`<text x="${x(h)}" y="${H-8}" text-anchor="middle">${pad(h)}:00</text>`;
+  s+=`<line x1="${x(S.h)}" x2="${x(S.h)}" y1="${mt}" y2="${H-mb}" stroke="var(--ink)" stroke-width="1" opacity=".5"/>`;
+  s+=`<path d="${ca.map((v,h)=>(h?'L':'M')+x(h)+' '+y(v)).join('')}" fill="none" stroke="#7f8f91" stroke-width="1.6" stroke-dasharray="5 4"/>`;
+  s+=`<path d="${r.map((v,h)=>(h?'L':'M')+x(h)+' '+y(v)).join('')}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round"/>`;
+  r.forEach((v,h)=>{const sel=h===S.h;s+=`<g data-h="${h}" style="cursor:pointer"><circle cx="${x(h)}" cy="${y(v)}" r="12" fill="transparent"/><circle cx="${x(h)}" cy="${y(v)}" r="${sel?6:3.5}" fill="var(--l${lvl(v,m)})" stroke="var(--ink)" stroke-width="${sel?2:1.2}"><title>${pad(h)}:00 · ${cfg.f(v)}</title></circle></g>`});
+  $('#chart').innerHTML=s;
+}
+
+/* 交互 */
+const tip=$('#tip');
+function showTip(n,h,px,py){
+  const m=S.m,cfg=M[m],v=D[m][n][h],l=lvl(v,m),nd=nodes[n];
+  const avg=D[m][n].reduce((a,b)=>a+b,0)/24,ca=clusterAvg(m)[h];
+  const dl=(a,b)=>{const d=a-b;return (d>=0?'+':'−')+cfg.f(Math.abs(d))};
+  tip.innerHTML=`<b>${nd.id}</b> <span class="m">${nd.role}</span><br>${pad(h)}:00 – ${pad(h)}:59<br>${cfg.name}:<b>${cfg.f(v)}</b><span class="tag" style="background:var(--l${l});color:var(--t${l})">${LV[l]}</span><br><span class="m">较该节点日均 ${dl(v,avg)}<br>较同时段全部节点 ${dl(v,ca)}</span>`;
+  tip.classList.add('show');
+  const w=tip.offsetWidth,hh=tip.offsetHeight;
+  let X=px+16,Y=py+16;if(X+w>innerWidth-8)X=px-w-16;if(Y+hh>innerHeight-8)Y=py-hh-16;
+  tip.style.left=X+'px';tip.style.top=Y+'px';
+}
+const grid=$('#grid');
+grid.addEventListener('mousemove',e=>{const c=e.target.closest('.c[data-n]');if(!c)return tip.classList.remove('show');showTip(+c.dataset.n,+c.dataset.h,e.clientX,e.clientY)});
+grid.addEventListener('mouseleave',()=>tip.classList.remove('show'));
+grid.addEventListener('focusin',e=>{const c=e.target.closest('.c[data-n]');if(c){const r=c.getBoundingClientRect();showTip(+c.dataset.n,+c.dataset.h,r.right,r.top)}});
+grid.addEventListener('focusout',()=>tip.classList.remove('show'));
+grid.addEventListener('click',e=>{const c=e.target.closest('.c[data-n]');if(!c)return;S.n=+c.dataset.n;S.h=+c.dataset.h;render();
+  const k=document.querySelector(`.c[data-n="${S.n}"][data-h="${S.h}"]`);if(k)k.focus({preventScroll:true})});
+$('#chart').addEventListener('click',e=>{const g=e.target.closest('g[data-h]');if(g){S.h=+g.dataset.h;render()}});
+$('#seg').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;S.m=b.dataset.m;S.focus=null;selectPeak();render()});
+$('#legend').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const f=+b.dataset.f;S.focus=S.focus===f?null:f;render()});
+$('#stats').addEventListener('click',e=>{const b=e.target.closest('[data-go]');if(!b)return;const [n,h]=b.dataset.go.split(',').map(Number);S.n=n;S.h=h;render()});
+$('#vals').addEventListener('change',e=>{S.vals=e.target.checked;render()});
+
+selectPeak();render();
+})();
+</script>
+</body>
+</html>

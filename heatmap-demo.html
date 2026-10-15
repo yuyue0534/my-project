@@ -1,0 +1,443 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Heatmap Demo - 单文件热力图示例</title>
+<style>
+  :root{
+    --bg:#f6f8fb;
+    --panel:#ffffff;
+    --text:#172033;
+    --muted:#6b7280;
+    --line:#e5e7eb;
+    --shadow:0 10px 30px rgba(15,23,42,.08);
+    --radius:16px;
+  }
+  *{box-sizing:border-box}
+  body{
+    margin:0;
+    font-family:Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;
+    color:var(--text);
+    background:var(--bg);
+  }
+  .wrap{max-width:1380px;margin:0 auto;padding:28px}
+  .hero{
+    display:flex;gap:20px;justify-content:space-between;align-items:flex-end;
+    margin-bottom:22px;
+  }
+  h1{margin:0 0 8px;font-size:30px;letter-spacing:-.5px}
+  .sub{color:var(--muted);font-size:14px;line-height:1.7}
+  .controls{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+  button,select{
+    border:1px solid var(--line);
+    background:#fff;
+    border-radius:10px;
+    padding:9px 12px;
+    font-size:14px;
+    cursor:pointer;
+    color:var(--text);
+  }
+  button:hover,select:hover{border-color:#cbd5e1}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:20px}
+  .card{
+    background:var(--panel);
+    border:1px solid #eef1f5;
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:20px;
+    min-width:0;
+  }
+  .card.full{grid-column:1/-1}
+  .card-head{display:flex;justify-content:space-between;align-items:flex-start;gap:16px;margin-bottom:16px}
+  .card h2{margin:0 0 5px;font-size:18px}
+  .desc{color:var(--muted);font-size:13px;line-height:1.6}
+  .legend{display:flex;align-items:center;gap:6px;color:var(--muted);font-size:12px;white-space:nowrap}
+  .legend span.box{width:18px;height:12px;border-radius:3px;display:inline-block}
+  .scroll{overflow:auto}
+  table{border-collapse:separate;border-spacing:5px;width:max-content;min-width:100%}
+  th{font-size:12px;color:var(--muted);font-weight:600;padding:4px 8px;white-space:nowrap;text-align:center}
+  th:first-child{text-align:left}
+  td{
+    min-width:58px;height:44px;text-align:center;border-radius:8px;
+    font-weight:700;font-size:13px;transition:.18s transform,.18s box-shadow;
+    position:relative;
+  }
+  td:hover{transform:translateY(-2px);box-shadow:0 6px 16px rgba(15,23,42,.12);z-index:2}
+  .name{
+    min-width:110px;text-align:left;padding:0 10px;background:transparent!important;
+    color:#334155;font-weight:600;
+  }
+
+  /* calendar */
+  .calendar-wrap{overflow:auto;padding-bottom:4px}
+  .calendar{
+    display:grid;
+    grid-template-columns:32px repeat(53, 13px);
+    grid-template-rows:20px repeat(7,13px);
+    gap:3px;
+    min-width:900px;
+    align-items:center;
+  }
+  .dow{font-size:10px;color:var(--muted);text-align:right;padding-right:4px}
+  .month{font-size:10px;color:var(--muted);align-self:end}
+  .day{
+    width:13px;height:13px;border-radius:3px;background:#eef2f6;
+    cursor:pointer;
+  }
+  .day:hover{outline:2px solid #64748b;outline-offset:1px}
+
+  /* click heatmap */
+  .stage-wrap{position:relative}
+  #clickCanvas{
+    width:100%;height:360px;border-radius:14px;border:1px solid var(--line);
+    display:block;background:#f8fafc;
+  }
+  .mock-ui{
+    position:absolute;inset:0;pointer-events:none;padding:20px;
+    display:flex;flex-direction:column;
+  }
+  .mock-top{height:44px;border-radius:10px;background:rgba(255,255,255,.83);border:1px solid rgba(203,213,225,.8)}
+  .mock-body{display:grid;grid-template-columns:180px 1fr;gap:14px;flex:1;margin-top:14px}
+  .mock-side{border-radius:12px;background:rgba(255,255,255,.78);border:1px solid rgba(203,213,225,.75)}
+  .mock-main{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  .mock-box{border-radius:12px;background:rgba(255,255,255,.78);border:1px solid rgba(203,213,225,.75)}
+  .hint{margin-top:10px;font-size:12px;color:var(--muted)}
+
+  /* KPI heatmap */
+  .kpi-grid{
+    display:grid;
+    grid-template-columns:130px repeat(7,1fr);
+    gap:6px;
+  }
+  .kpi-head,.kpi-name,.kpi-cell{
+    min-height:42px;border-radius:8px;display:flex;align-items:center;justify-content:center;
+    font-size:12px;
+  }
+  .kpi-head{color:var(--muted);font-weight:600}
+  .kpi-name{justify-content:flex-start;padding-left:10px;color:#334155;font-weight:600}
+  .kpi-cell{font-weight:700;cursor:pointer;transition:.15s}
+  .kpi-cell:hover{transform:scale(1.04)}
+
+  .tooltip{
+    position:fixed;pointer-events:none;z-index:9999;display:none;
+    background:#0f172a;color:white;padding:9px 11px;border-radius:8px;
+    font-size:12px;line-height:1.55;box-shadow:0 8px 22px rgba(15,23,42,.24);
+    max-width:240px;
+  }
+  .badge{
+    display:inline-flex;align-items:center;gap:6px;border-radius:999px;
+    font-size:12px;padding:5px 9px;background:#eef2ff;color:#4338ca;font-weight:600;
+  }
+  @media(max-width:900px){
+    .grid{grid-template-columns:1fr}
+    .card.full{grid-column:auto}
+    .hero{align-items:flex-start;flex-direction:column}
+  }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <div class="hero">
+    <div>
+      <h1>前端热力图 Demo</h1>
+      <div class="sub">单文件、零依赖。包含二维工时矩阵、GitHub 风格年度日历、Canvas 点击热力图、业务指标热力表。把鼠标移到格子或热区上查看详细信息。</div>
+    </div>
+    <div class="controls">
+      <span class="badge">4 种 Heatmap</span>
+      <select id="weekMode">
+        <option value="normal">正常周</option>
+        <option value="busy">高负载周</option>
+        <option value="light">低负载周</option>
+      </select>
+      <button id="randomBtn">重新生成数据</button>
+    </div>
+  </div>
+
+  <div class="grid">
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>1. 工时矩阵热力图</h2>
+          <div class="desc">最适合后台系统：人员 × 星期，数值直接映射为颜色深浅，并保留原始数字。</div>
+        </div>
+        <div class="legend">
+          低 <span class="box" style="background:#e0f2fe"></span>
+          <span class="box" style="background:#7dd3fc"></span>
+          <span class="box" style="background:#0284c7"></span> 高
+        </div>
+      </div>
+      <div class="scroll"><table id="workTable"></table></div>
+    </section>
+
+    <section class="card">
+      <div class="card-head">
+        <div>
+          <h2>2. 年度日历热力图</h2>
+          <div class="desc">GitHub Contributions 风格，适合每日提交量、访问量、工时、Ticket、考勤异常次数等。</div>
+        </div>
+        <div class="legend">
+          少 <span class="box" style="background:#eef2f6"></span>
+          <span class="box" style="background:#bbf7d0"></span>
+          <span class="box" style="background:#22c55e"></span>
+          <span class="box" style="background:#166534"></span> 多
+        </div>
+      </div>
+      <div class="calendar-wrap"><div class="calendar" id="calendar"></div></div>
+    </section>
+
+    <section class="card full">
+      <div class="card-head">
+        <div>
+          <h2>3. 页面点击热力图（Canvas）</h2>
+          <div class="desc">常用于埋点和用户行为分析。下面模拟一个后台页面，热区越亮表示点击越集中；你也可以直接点击画布继续追加热区。</div>
+        </div>
+        <button id="clearClicks">清空点击</button>
+      </div>
+      <div class="stage-wrap">
+        <canvas id="clickCanvas"></canvas>
+        <div class="mock-ui">
+          <div class="mock-top"></div>
+          <div class="mock-body">
+            <div class="mock-side"></div>
+            <div class="mock-main">
+              <div class="mock-box"></div>
+              <div class="mock-box"></div>
+              <div class="mock-box"></div>
+              <div class="mock-box"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="hint">提示：点击画布任意位置，可以模拟新的用户点击；点击“清空点击”可重置。</div>
+    </section>
+
+    <section class="card full">
+      <div class="card-head">
+        <div>
+          <h2>4. 业务指标热力表</h2>
+          <div class="desc">不是所有热力图都需要图表库。企业后台经常直接给表格单元格着色，信息密度高、易读、易与详情钻取结合。</div>
+        </div>
+        <div class="legend">
+          正常 <span class="box" style="background:#dcfce7"></span>
+          注意 <span class="box" style="background:#fde68a"></span>
+          异常 <span class="box" style="background:#fecaca"></span>
+        </div>
+      </div>
+      <div class="scroll"><div id="kpiGrid" class="kpi-grid"></div></div>
+    </section>
+  </div>
+</div>
+<div id="tooltip" class="tooltip"></div>
+
+<script>
+const tooltip = document.getElementById('tooltip');
+function showTip(html,e){
+  tooltip.innerHTML=html;
+  tooltip.style.display='block';
+  moveTip(e);
+}
+function moveTip(e){
+  const pad=14;
+  let x=e.clientX+pad, y=e.clientY+pad;
+  const w=tooltip.offsetWidth||180, h=tooltip.offsetHeight||80;
+  if(x+w>innerWidth-8) x=e.clientX-w-pad;
+  if(y+h>innerHeight-8) y=e.clientY-h-pad;
+  tooltip.style.left=x+'px'; tooltip.style.top=y+'px';
+}
+function hideTip(){tooltip.style.display='none'}
+document.addEventListener('mousemove',e=>{if(tooltip.style.display==='block')moveTip(e)});
+
+function clamp(v,min,max){return Math.max(min,Math.min(max,v))}
+function lerp(a,b,t){return Math.round(a+(b-a)*t)}
+function colorScale(v,min,max,from,to){
+  const t=clamp((v-min)/(max-min||1),0,1);
+  return `rgb(${lerp(from[0],to[0],t)},${lerp(from[1],to[1],t)},${lerp(from[2],to[2],t)})`;
+}
+function textColor(v,max){return v/max>.58?'#fff':'#0f172a'}
+
+const people=['Alice','Bob','Charlie','David','Emma','Frank','Grace','Henry'];
+const days=['Mon','Tue','Wed','Thu','Fri'];
+let mode='normal';
+let workData=[];
+
+function generateWorkData(){
+  const cfg={
+    normal:[2,9],
+    busy:[6,11],
+    light:[0,5]
+  }[mode];
+  workData=people.map(name=>({
+    name,
+    values:days.map(()=>+(cfg[0]+Math.random()*(cfg[1]-cfg[0])).toFixed(1))
+  }));
+  renderWorkTable();
+}
+function renderWorkTable(){
+  const table=document.getElementById('workTable');
+  let html='<thead><tr><th>Member</th>'+days.map(d=>`<th>${d}</th>`).join('')+'<th>Total</th></tr></thead><tbody>';
+  workData.forEach(row=>{
+    const total=row.values.reduce((a,b)=>a+b,0);
+    html+=`<tr><td class="name">${row.name}</td>`;
+    row.values.forEach((v,i)=>{
+      const bg=colorScale(v,0,10,[224,242,254],[2,132,199]);
+      html+=`<td data-tip="<b>${row.name}</b><br>${days[i]}：${v} h<br>负载：${v>8?'高':v>=5?'正常':'较低'}" style="background:${bg};color:${textColor(v,10)}">${v}</td>`;
+    });
+    html+=`<td style="background:#f1f5f9;color:#334155">${total.toFixed(1)}</td></tr>`;
+  });
+  html+='</tbody>'; table.innerHTML=html;
+  table.querySelectorAll('[data-tip]').forEach(el=>{
+    el.addEventListener('mouseenter',e=>showTip(el.dataset.tip,e));
+    el.addEventListener('mouseleave',hideTip);
+  });
+}
+
+function dateKey(d){return d.toISOString().slice(0,10)}
+function generateCalendar(){
+  const root=document.getElementById('calendar'); root.innerHTML='';
+  const year=2026, start=new Date(year,0,1), end=new Date(year,11,31);
+  const firstSunday=new Date(start);
+  firstSunday.setDate(start.getDate()-start.getDay());
+
+  const monthMarks=[];
+  for(let m=0;m<12;m++){
+    const d=new Date(year,m,1);
+    const week=Math.floor((d-firstSunday)/(7*86400000))+1;
+    monthMarks.push({week,label:d.toLocaleString('en',{month:'short'})});
+  }
+  monthMarks.forEach(m=>{
+    const el=document.createElement('div'); el.className='month'; el.textContent=m.label;
+    el.style.gridColumn=(m.week+1); el.style.gridRow=1; root.appendChild(el);
+  });
+  ['Sun','Mon','Tue','Wed','Thu','Fri','Sat'].forEach((d,i)=>{
+    const el=document.createElement('div'); el.className='dow'; el.textContent=i%2?d:'';
+    el.style.gridColumn=1; el.style.gridRow=i+2; root.appendChild(el);
+  });
+
+  let d=new Date(start);
+  while(d<=end){
+    const week=Math.floor((d-firstSunday)/(7*86400000))+1;
+    const dow=d.getDay();
+    const v=Math.max(0,Math.round((Math.sin((d.getTime()/86400000)/17)+1)*2.4 + Math.random()*4 - 1.5));
+    const el=document.createElement('div'); el.className='day';
+    let bg='#eef2f6';
+    if(v===1) bg='#dcfce7';
+    else if(v<=3 && v>1) bg='#86efac';
+    else if(v<=5 && v>3) bg='#22c55e';
+    else if(v>5) bg='#166534';
+    el.style.background=bg;
+    el.style.gridColumn=week+1;
+    el.style.gridRow=dow+2;
+    const ds=dateKey(d);
+    el.dataset.tip=`<b>${ds}</b><br>Activity：${v}<br>${v===0?'无活动':v>=6?'高活跃':v>=3?'中等活跃':'低活跃'}`;
+    el.addEventListener('mouseenter',e=>showTip(el.dataset.tip,e));
+    el.addEventListener('mouseleave',hideTip);
+    root.appendChild(el);
+    d.setDate(d.getDate()+1);
+  }
+}
+
+const canvas=document.getElementById('clickCanvas');
+const ctx=canvas.getContext('2d');
+let clicks=[];
+function resizeCanvas(){
+  const rect=canvas.getBoundingClientRect();
+  const dpr=window.devicePixelRatio||1;
+  canvas.width=Math.round(rect.width*dpr);
+  canvas.height=Math.round(rect.height*dpr);
+  ctx.setTransform(dpr,0,0,dpr,0,0);
+  drawHeatmap();
+}
+function seedClicks(){
+  const rect=canvas.getBoundingClientRect();
+  clicks=[];
+  const clusters=[
+    [rect.width*.78,55,32],
+    [rect.width*.43,135,24],
+    [rect.width*.68,255,28],
+    [rect.width*.18,180,14],
+    [rect.width*.86,185,19]
+  ];
+  clusters.forEach(([cx,cy,n])=>{
+    for(let i=0;i<n;i++){
+      clicks.push({
+        x:cx+(Math.random()-.5)*85,
+        y:cy+(Math.random()-.5)*65,
+        value:.55+Math.random()*.45
+      });
+    }
+  });
+}
+function drawHeatmap(){
+  const rect=canvas.getBoundingClientRect();
+  ctx.clearRect(0,0,rect.width,rect.height);
+  ctx.fillStyle='#f8fafc'; ctx.fillRect(0,0,rect.width,rect.height);
+  clicks.forEach(p=>{
+    const r=44;
+    const g=ctx.createRadialGradient(p.x,p.y,0,p.x,p.y,r);
+    g.addColorStop(0,`rgba(239,68,68,${.34*p.value})`);
+    g.addColorStop(.35,`rgba(249,115,22,${.26*p.value})`);
+    g.addColorStop(.65,`rgba(250,204,21,${.18*p.value})`);
+    g.addColorStop(1,'rgba(250,204,21,0)');
+    ctx.fillStyle=g;
+    ctx.fillRect(p.x-r,p.y-r,r*2,r*2);
+  });
+}
+canvas.addEventListener('click',e=>{
+  const r=canvas.getBoundingClientRect();
+  const x=e.clientX-r.left,y=e.clientY-r.top;
+  for(let i=0;i<10;i++){
+    clicks.push({x:x+(Math.random()-.5)*24,y:y+(Math.random()-.5)*24,value:.7+Math.random()*.3});
+  }
+  drawHeatmap();
+});
+document.getElementById('clearClicks').addEventListener('click',()=>{clicks=[];drawHeatmap()});
+
+function renderKpi(){
+  const root=document.getElementById('kpiGrid'); root.innerHTML='';
+  const headers=['Metric','Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+  headers.forEach(h=>{
+    const el=document.createElement('div'); el.className='kpi-head'; el.textContent=h; root.appendChild(el);
+  });
+  const rows=[
+    ['CPU Usage %',()=>20+Math.random()*75,80],
+    ['Response ms',()=>80+Math.random()*520,400],
+    ['Error Count',()=>Math.random()*18,10],
+    ['Ticket Backlog',()=>6+Math.random()*44,30],
+    ['SLA Risk %',()=>Math.random()*35,20]
+  ];
+  rows.forEach(([name,gen,threshold])=>{
+    const nameEl=document.createElement('div'); nameEl.className='kpi-name'; nameEl.textContent=name; root.appendChild(nameEl);
+    for(let i=0;i<7;i++){
+      const v=+gen().toFixed(name.includes('%')||name.includes('ms')||name.includes('Count')||name.includes('Backlog')?0:1);
+      const ratio=v/threshold;
+      let bg='#dcfce7', fg='#166534', status='正常';
+      if(ratio>=1){bg='#fecaca';fg='#991b1b';status='异常';}
+      else if(ratio>=.72){bg='#fde68a';fg='#92400e';status='注意';}
+      const cell=document.createElement('div'); cell.className='kpi-cell';
+      cell.style.background=bg;cell.style.color=fg;cell.textContent=v;
+      cell.dataset.tip=`<b>${name}</b><br>${['Mon','Tue','Wed','Thu','Fri','Sat','Sun'][i]}：${v}<br>状态：${status}`;
+      cell.addEventListener('mouseenter',e=>showTip(cell.dataset.tip,e));
+      cell.addEventListener('mouseleave',hideTip);
+      root.appendChild(cell);
+    }
+  });
+}
+
+document.getElementById('weekMode').addEventListener('change',e=>{mode=e.target.value;generateWorkData()});
+document.getElementById('randomBtn').addEventListener('click',()=>{
+  generateWorkData();generateCalendar();renderKpi();seedClicks();drawHeatmap();
+});
+window.addEventListener('resize',resizeCanvas);
+
+generateWorkData();
+generateCalendar();
+renderKpi();
+requestAnimationFrame(()=>{
+  resizeCanvas();
+  seedClicks();
+  drawHeatmap();
+});
+</script>
+</body>
+</html>
